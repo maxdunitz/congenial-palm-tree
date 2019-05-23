@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
@@ -66,8 +67,13 @@ if __name__ == "__main__":
     other_midpoint_dir =  np.array([-dir_1[0] - dir_2[0], -dir_1[1] - dir_2[1], -dir_1[2] - dir_2[2]])
     other_midpoint_dir = other_midpoint_dir / np.linalg.norm(other_midpoint_dir)
     other_point_midtrace = Rearth * other_midpoint_dir
-
-
+    toward_north = np.cross(dir_1, dir_2)
+    
+    xs_to_probe_deg = np.array([50, 60, 70, 80, 100, 110, 120, 130])
+    xs_to_probe = xs_to_probe_deg * (2*np.pi/360.0)
+    rotations_to_probe = np.pi/2.0 - xs_to_probe
+    Nrot = len(rotations_to_probe)
+    
     # Set figures
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1, projection="3d")
@@ -77,11 +83,13 @@ if __name__ == "__main__":
 
 
     # Animated data generation
-    def gen(period): # orbit in Cartesian coordinates
+    def gen(period): # actual orbit in Cartesian coordinates
         minutes = 0
         while minutes < period:
             t = (2*np.pi)/period * minutes
-            yield np.array([np.cos(t)*point_1[0] + np.sin(t)*point_2[0], np.cos(t)*point_1[1] + np.sin(t)*point_2[1], np.cos(t)*point_1[2] + np.sin(t)*point_2[2]])
+            point = np.array([np.cos(t)*point_1[0] + np.sin(t)*point_2[0], np.cos(t)*point_1[1] + np.sin(t)*point_2[1], np.cos(t)*point_1[2] + np.sin(t)*point_2[2]])
+            print("ORBIT", Rorbit, np.linalg.norm(point))
+            yield point
             minutes += 1
 
     def gen2(period): # eta, xi
@@ -99,31 +107,80 @@ if __name__ == "__main__":
         while minutes < period:
             yield minutes/period * max_
 
-    def gen4(period): # eta, xi along arc (1 degree, y(t))
-        pass
+    def gen4(period, angle): # eta, xi along arc (0.5 radian, y(t))
+        minutes = 0
+        while minutes < period:
+            t = (2*np.pi)/period * minutes
+            pt = (Rearth/Rorbit) * np.array([np.cos(t)*point_1[0] + np.sin(t)*point_2[0], np.cos(t)*point_1[1] + np.sin(t)*point_2[1], np.cos(t)*point_1[2] + np.sin(t)*point_2[2]])
+            raxis = np.cross(pt, toward_north)
+            rotated_pt = rodrigues_rotation(pt, raxis, angle)
+            eta, xi = cartesian_to_eta_xi(*rotated_pt)
+            yield np.array([eta, xi])
+            minutes += 1
 
-    def gen5(period): # eta, xi along arc (-1 degree, y(t))
-        pass
+    def gen6(period, angle): # trace with varying colatitude x (angle is the complement to the colatitude, ie the latitude pi/2 - x)
+        minutes = 0
+        while minutes < period:
+            t = (2*np.pi)/period * minutes
+            pt = (Rearth/Rorbit) * np.array([np.cos(t)*point_1[0] + np.sin(t)*point_2[0], np.cos(t)*point_1[1] + np.sin(t)*point_2[1], np.cos(t)*point_1[2] + np.sin(t)*point_2[2]])
+            raxis = np.cross(pt, toward_north)
+            rot = rodrigues_rotation(pt, raxis, angle)
+            print(np.linalg.norm(rot), np.linalg.norm(pt), Rorbit)
+            print(rot)
+            yield rot
+            minutes += 1
+
 
     # Update functions
-    def update(num, data, line):
+    def update(num, data, line): # for the orbit
         line.set_data(data[:2, :num])
         line.set_3d_properties(data[2, :num])
 
-    def update2(num, data, line):
+    def update2(num, data, line): # for the orbit in the xi-eta plane
         line.set_data(data[:2, :num])
         line.axes.axis([-1, 1, -1, 1])
         return line,
 
+    def update3(num, data, line): # for the orbit echoes (varying x)
+        line.set_data(data[:2, :num])
+        line.set_3d_properties(data[2, :num])
+        line.set_color('k')
+        line.set_alpha(0.2)
+
+    def update4(num, data, line): # for orbit echoes in the xi-eta plane 
+        line.set_data(data[:2, :num])
+        line.set_color('k')
+        line.set_alpha(0.2)
+        return line,
+
 
     # Compute animation
+    # orbit around sphere
     data = np.array(list(gen(period))).T
     line, = ax.plot(data[0, 0:1], data[1, 0:1], data[2, 0:1])
+    
+    # orbit echoes around sphere
+    lines3d = []
+    datas3d = []
+    for r in rotations_to_probe:
+        d = np.array(list(gen6(period, r))).T
+        l, = ax.plot(d[0, 0:1], d[1, 0:1], d[2, 0:1])
+        lines3d.append(l)
+        datas3d.append(d)
 
+    # orbit in xi-eta plane
     data2 = np.array(list(gen2(period))).T
     line2, = ax2.plot(data2[0,:], data2[1,:])
 
-
+    # orbit echoes in xi-eta plane
+    lines2d = []
+    datas2d = []
+    for r in rotations_to_probe:
+        d = np.array(list(gen4(period, r))).T
+        l, = ax.plot(d[0,:], d[1,:])
+        lines2d.append(l)
+        datas2d.append(d)
+        
     # Plot static info
     # sphere
     u, v = np.mgrid[0:2*np.pi:960j, 0:np.pi:480j]
@@ -167,9 +224,28 @@ if __name__ == "__main__":
 
 
     # Animate
-    ani = FuncAnimation(fig, update, int(period), fargs=(data, line), blit=False)
+    ani1 = FuncAnimation(fig, update, int(period), fargs=(data, line), blit=False)
+    ani_0 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[0], lines3d[0]), blit=False)
+    ani_1 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[1], lines3d[1]), blit=False)
+    ani_2 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[2], lines3d[2]), blit=False)
+    ani_3 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[3], lines3d[3]), blit=False)
+    ani_4 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[4], lines3d[4]), blit=False)
+    ani_5 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[5], lines3d[5]), blit=False)
+    ani_6 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[6], lines3d[6]), blit=False)
+    ani_7 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[7], lines3d[7]), blit=False)
+    #for d, l in zip(datas3d, lines3d):
+    #    ani_ = FuncAnimation(fig, update3, int(period), fargs=(d, l), blit=False)
     ani2 = FuncAnimation(fig2, update2, int(period), fargs=(data2, line2), blit=False)
-    
+    an_0 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[0], lines2d[0]), blit=False)
+    an_1 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[1], lines2d[1]), blit=False)
+    an_2 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[2], lines2d[2]), blit=False)
+    an_3 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[3], lines2d[3]), blit=False)
+    an_4 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[4], lines2d[4]), blit=False)
+    an_5 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[5], lines2d[5]), blit=False)
+    an_6 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[6], lines2d[6]), blit=False)
+    an_7 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[7], lines2d[7]), blit=False)
+    #for d, l in zip(datas2d, lines2d):
+    #    ani_ = FuncAnimation(fig2, update4, int(period), fargs=(d, l), blit=False)
     #ani.save('matplot003.gif', writer='imagemagick')
     plt.show() 
 
