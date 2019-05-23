@@ -4,7 +4,6 @@ from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
 
 
-
 ## helper functions ##
 
 def cartesian_to_eta_xi(x,y,z):
@@ -29,6 +28,25 @@ def spherical_to_cartesian(rho, theta, phi):
     y = rho * np.sin(theta)*np.sin(phi)
     z = rho * np.cos(theta)
     return (x,y,z)
+
+def rotation_matrix(axis, theta):
+    """
+    Return the rotation matrix associated with counterclockwise rotation about
+    the given axis by theta radians.
+    """
+    axis = np.asarray(axis)
+    axis = axis / math.sqrt(np.dot(axis, axis))
+    a = math.cos(theta / 2.0)
+    b, c, d = -axis * math.sin(theta / 2.0)
+    aa, bb, cc, dd = a * a, b * b, c * c, d * d
+    bc, ad, ac, ab, bd, cd = b * c, a * d, a * c, a * b, b * d, c * d
+    return np.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
+                     [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
+                     [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
+
+def rodrigues_rotation(v, axis, theta):
+    return np.dot(rotation_matrix(axis, theta), v)
+
 
 if __name__ == "__main__":
     # Geometric parameters
