@@ -238,7 +238,7 @@ if __name__ == "__main__":
     ani_7 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[7], lines3d[7]), blit=False)
     #for d, l in zip(datas3d, lines3d):
     #    ani_ = FuncAnimation(fig, update3, int(period), fargs=(d, l), blit=False)
-    ani2 = FuncAnimation(fig2, update2, int(period), fargs=(data2, line2), blit=False)
+    #ani2 = FuncAnimation(fig2, update2, int(period), fargs=(data2, line2), blit=False)
     an_0 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[0], lines2d[0]), blit=False)
     an_1 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[1], lines2d[1]), blit=False)
     an_2 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[2], lines2d[2]), blit=False)
