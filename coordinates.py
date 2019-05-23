@@ -55,12 +55,13 @@ if __name__ == "__main__":
     Alt = 755 # altitude of satellite (km)
     Rorbit = Rearth + Alt
     period = 100.2 # period of satellite orbit (minutes)
+    
+    # two random points at distance Rorbit from the origin
     rand_1 = np.random.randn(3)
     dir_1 = rand_1 *1.0/np.linalg.norm(rand_1)
     rand_2 = np.random.randn(3)
     dir_2 = rand_2 * 1.0/np.linalg.norm(rand_2)
     point_1 = Rorbit*dir_1
-    point_2 = Rorbit*dir_2
     midpoint_dir =  np.array([dir_1[0] + dir_2[0], dir_1[1] + dir_2[1], dir_1[2] + dir_2[2]])
     midpoint_dir = midpoint_dir / np.linalg.norm(midpoint_dir)
     point_midtrace = Rearth * midpoint_dir
@@ -68,6 +69,8 @@ if __name__ == "__main__":
     other_midpoint_dir = other_midpoint_dir / np.linalg.norm(other_midpoint_dir)
     other_point_midtrace = Rearth * other_midpoint_dir
     toward_north = np.cross(dir_1, dir_2)
+    dir_2 = np.cross(toward_north, dir_1) #make dir_2 orthogonal
+    point_2 = Rorbit*dir_2
     
     xs_to_probe_deg = np.array([50, 60, 70, 80, 100, 110, 120, 130])
     xs_to_probe = xs_to_probe_deg * (2*np.pi/360.0)
