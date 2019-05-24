@@ -85,6 +85,9 @@ if __name__ == "__main__":
     fig2 = plt.figure()
     ax2 = fig2.add_subplot(1,1,1)
 
+    fig3 = plt.figure()
+    ax3 = fig3.add_subplot(2,1,1, projection="3d")
+    ax4 = fig3.add_subplot(2,1,2)
 
     # Animated data generation
     def gen(period): # actual orbit in Cartesian coordinates
@@ -193,6 +196,22 @@ if __name__ == "__main__":
     z = Rearth * np.cos(v)
     ax.plot_wireframe(x, y, z, color="r", alpha=0.05)
 
+    # second sphere
+    print(z.shape, x.shape, y.shape)
+    print(x[z>=0].shape)
+    u, v = np.mgrid[0:2*np.pi:240j, 0:np.pi:120j]
+    x = Rearth * np.cos(u)*np.sin(v)
+    y = Rearth * np.sin(u)*np.sin(v)
+    z = Rearth * np.cos(v)
+    ax.plot_wireframe(x, y, z, color="r", alpha=0.05)
+    ax3.scatter(x[np.logical_and(z>=0, y>=0)], y[np.logical_and(z>=0, y>=0)], z[np.logical_and(z>=0, y>=0)], color='r', alpha=0.05)
+    ax3.scatter(x[np.logical_and(z<0, y>=0)], y[np.logical_and(z<0, y>=0)], z[np.logical_and(z<0, y>=0)], color='b', alpha=0.05)
+    ttt = np.logical_and(y < 0, np.logical_and(x>=0, z>=0))
+    uuu = np.logical_and(y < 0, np.logical_and(x<0, z>=0))
+    vvv = np.logical_and(y < 0, np.logical_and(x<0, z<0))
+    ax3.scatter(x[ttt], y[ttt], z[ttt], color='k', alpha=0.05)
+    ax3.scatter(x[uuu], y[uuu], z[uuu], color='m', alpha=0.05)
+    ax3.scatter(x[vvv], y[vvv], z[vvv], color='y', alpha=0.05)
     # fixed points on sphere/orbit 
     ax.scatter([0], [0], [0], color="b", s=10) #origin 
     ax.scatter([point_midtrace[0]], [point_midtrace[1]], [point_midtrace[2]], color='k', s=2) # midpoint of trace
@@ -203,7 +222,7 @@ if __name__ == "__main__":
     # unit disk in eta/xi plane
     tt = np.linspace(0, 2*np.pi, 1000)
     ax2.plot(np.cos(tt), np.sin(tt), linewidth=1, alpha = 0.33)
-    
+
     # fixed points in eta/xi plane
     eta, xi = cartesian_to_eta_xi(*point_1) # random point 1
     ax2.scatter([eta], [xi], color='g', s=8)
@@ -213,6 +232,55 @@ if __name__ == "__main__":
     ax2.scatter([eta], [xi], color='k', s=2)
     eta, xi = cartesian_to_eta_xi(*other_point_midtrace) # midtrace point 
     ax2.scatter([eta], [xi], color='k', s=2)
+
+    # second disk
+    ax4.plot(np.cos(tt), np.sin(tt), linewidth=1, alpha = 0.33)
+    etas = np.zeros(len(x[np.logical_and(z>=0, y>=0)]),)
+    xis = np.zeros(len(x[np.logical_and(z>=0, y>=0)]),)
+    i=0
+    for xx, yy, zz in zip(x[np.logical_and(z>=0, y>=0)],y[np.logical_and(z>=0, y>=0)],z[np.logical_and(z>=0, y>=0)]):
+        (eta, xi) = cartesian_to_eta_xi(xx,yy,zz)
+        etas[i] = eta
+        xis[i] = xi
+        i+=1
+    ax4.scatter(etas, xis, color='r', alpha=0.05)
+    etas = np.zeros(len(x[np.logical_and(z<0, y>=0)]),)
+    xis = np.zeros(len(x[np.logical_and(z<0, y>=0)]),)
+    i=0
+    for xx, yy, zz in zip(x[np.logical_and(z<0, y>=0)],y[np.logical_and(z<0, y>=0)],z[np.logical_and(z<0, y>=0)]):
+        (eta, xi) = cartesian_to_eta_xi(xx,yy,zz)
+        etas[i] = eta
+        xis[i] = xi
+        i+=1
+    ax4.scatter(etas, xis, color='b', alpha=0.05)
+    etas = np.zeros(len(x[ttt]),)
+    xis = np.zeros(len(x[ttt]),)
+    i=0
+    for xx, yy, zz in zip(x[ttt],y[ttt],z[ttt]):
+        (eta, xi) = cartesian_to_eta_xi(xx,yy,zz)
+        etas[i] = eta
+        xis[i] = xi
+        i+=1
+    ax4.scatter(etas, xis, color='k', alpha=0.05)
+    etas = np.zeros(len(x[uuu]),)
+    xis = np.zeros(len(x[uuu]),)
+    i=0
+    for xx, yy, zz in zip(x[uuu],y[uuu],z[uuu]):
+        (eta, xi) = cartesian_to_eta_xi(xx,yy,zz)
+        etas[i] = eta
+        xis[i] = xi
+        i+=1
+    ax4.scatter(etas, xis, color='m', alpha=0.05)
+    etas = np.zeros(len(x[vvv]),)
+    xis = np.zeros(len(x[vvv]),)
+    i=0
+    for xx, yy, zz in zip(x[vvv],y[vvv],z[vvv]):
+        (eta, xi) = cartesian_to_eta_xi(xx,yy,zz)
+        etas[i] = eta
+        xis[i] = xi
+        i+=1
+    ax4.scatter(etas, xis, color='y', alpha=0.05)
+
 
 
     # Set the axes properties
@@ -226,6 +294,8 @@ if __name__ == "__main__":
     ax2.set_xlabel('eta')
     ax2.set_ylabel('xi')
 
+    ax4.set_xlabel('eta')
+    ax2.set_ylabel('xi')
 
     # Animate
     ani1 = FuncAnimation(fig, update, int(period), fargs=(data, line), blit=False)
