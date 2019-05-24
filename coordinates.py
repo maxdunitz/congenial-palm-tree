@@ -69,6 +69,7 @@ if __name__ == "__main__":
     other_midpoint_dir = other_midpoint_dir / np.linalg.norm(other_midpoint_dir)
     other_point_midtrace = Rearth * other_midpoint_dir
     toward_north = np.cross(dir_1, dir_2)
+    toward_north = toward_north / np.linalg.norm(toward_north)
     dir_2 = np.cross(toward_north, dir_1) #make dir_2 orthogonal
     point_2 = Rorbit*dir_2
     
@@ -90,7 +91,7 @@ if __name__ == "__main__":
         minutes = 0
         while minutes < period:
             t = (2*np.pi)/period * minutes
-            point = np.array([np.cos(t)*point_1[0] + np.sin(t)*point_2[0], np.cos(t)*point_1[1] + np.sin(t)*point_2[1], np.cos(t)*point_1[2] + np.sin(t)*point_2[2]])
+            point = Rorbit * np.array([np.cos(t)*dir_1[0] + np.sin(t)*dir_2[0], np.cos(t)*dir_1[1] + np.sin(t)*dir_2[1], np.cos(t)*dir_1[2] + np.sin(t)*dir_2[2]])
             print("ORBIT", Rorbit, np.linalg.norm(point))
             yield point
             minutes += 1
@@ -99,7 +100,7 @@ if __name__ == "__main__":
         minutes = 0
         while minutes < period:
             t = (2*np.pi)/period * minutes
-            pt = np.array([np.cos(t)*point_1[0] + np.sin(t)*point_2[0], np.cos(t)*point_1[1] + np.sin(t)*point_2[1], np.cos(t)*point_1[2] + np.sin(t)*point_2[2]])
+            pt = Rorbit*np.array([np.cos(t)*dir_1[0] + np.sin(t)*dir_2[0], np.cos(t)*dir_1[1] + np.sin(t)*dir_2[1], np.cos(t)*dir_1[2] + np.sin(t)*dir_2[2]])
             eta, xi = cartesian_to_eta_xi(*pt)
             yield np.array([eta, xi])
             minutes += 1
@@ -114,7 +115,7 @@ if __name__ == "__main__":
         minutes = 0
         while minutes < period:
             t = (2*np.pi)/period * minutes
-            pt = (Rearth/Rorbit) * np.array([np.cos(t)*point_1[0] + np.sin(t)*point_2[0], np.cos(t)*point_1[1] + np.sin(t)*point_2[1], np.cos(t)*point_1[2] + np.sin(t)*point_2[2]])
+            pt = Rearth * np.array([np.cos(t)*dir_1[0] + np.sin(t)*dir_2[0], np.cos(t)*dir_1[1] + np.sin(t)*dir_2[1], np.cos(t)*dir_1[2] + np.sin(t)*dir_2[2]])
             raxis = np.cross(pt, toward_north)
             rotated_pt = rodrigues_rotation(pt, raxis, angle)
             eta, xi = cartesian_to_eta_xi(*rotated_pt)
@@ -125,7 +126,7 @@ if __name__ == "__main__":
         minutes = 0
         while minutes < period:
             t = (2*np.pi)/period * minutes
-            pt = (Rearth/Rorbit) * np.array([np.cos(t)*point_1[0] + np.sin(t)*point_2[0], np.cos(t)*point_1[1] + np.sin(t)*point_2[1], np.cos(t)*point_1[2] + np.sin(t)*point_2[2]])
+            pt = Rearth * np.array([np.cos(t)*dir_1[0] + np.sin(t)*dir_2[0], np.cos(t)*dir_1[1] + np.sin(t)*dir_2[1], np.cos(t)*dir_1[2] + np.sin(t)*dir_2[2]])
             raxis = np.cross(pt, toward_north)
             rot = rodrigues_rotation(pt, raxis, angle)
             print(np.linalg.norm(rot), np.linalg.norm(pt), Rorbit)
@@ -180,7 +181,7 @@ if __name__ == "__main__":
     datas2d = []
     for r in rotations_to_probe:
         d = np.array(list(gen4(period, r))).T
-        l, = ax.plot(d[0,:], d[1,:])
+        l, = ax2.plot(d[0,:], d[1,:])
         lines2d.append(l)
         datas2d.append(d)
         
@@ -238,7 +239,7 @@ if __name__ == "__main__":
     ani_7 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[7], lines3d[7]), blit=False)
     #for d, l in zip(datas3d, lines3d):
     #    ani_ = FuncAnimation(fig, update3, int(period), fargs=(d, l), blit=False)
-    #ani2 = FuncAnimation(fig2, update2, int(period), fargs=(data2, line2), blit=False)
+    ani2 = FuncAnimation(fig2, update2, int(period), fargs=(data2, line2), blit=False)
     an_0 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[0], lines2d[0]), blit=False)
     an_1 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[1], lines2d[1]), blit=False)
     an_2 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[2], lines2d[2]), blit=False)
