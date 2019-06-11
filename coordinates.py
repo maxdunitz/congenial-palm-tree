@@ -25,8 +25,27 @@ def eta_xi_to_satellite_centered_spherical(eta, xi):
     
     return (rho, theta, phi)
     
-def eta_xi_to_x_y(eta, xi):
-    pass
+def eta_xi_to_satellite_centered_Cartesian(eta, xi):
+    zeta = np.sqrt(1-xi**2-eta**2)
+    second_term = np.sqrt(R**2-(R+h)**2*(xi**2+eta**2))
+    common_term = (R+h)*zeta - second_term
+    x = xi * common_term
+    y = eta * common_term
+    z = -1.0*zeta*common_term
+    return (x,y,z)
+
+def eta_xi_to_x_y_lookangle(eta, xi):
+    rho,theta,phi = eta_xi_to_satellite_centered_spherical(eta, xi)
+    ztr = np.sqrt(R**2 - np.sin(theta)**2 * np.sin(phi)**2 * ((R+h)*np.cos(theta) + np.sqrt(R**2-(R+h)**2*np.sin(theta)**2))**2)
+    xobs,yobs,zobs = eta_xi_to_satellite_centered_Cartesian(eta, xi)
+    CTR_SSP = np.array([0,0,R])
+    CTR_OBS = np.array([xobs,yobs,zobs+R+h])
+    CTR_TR = np.array([0,yobs,ztr])
+    xangular = np.arccos(np.dot(CTR_SSP,CTR_TR)/(R**2))
+    yangular = np.arccos(np.dot(CTR_TR,CTR_OBS)/(R**2))
+    gamma = np.arccos(np.cos(xangular)*np.cos(yangular))
+    lookangle = np.arccos((R+h)/rho * np.sin(gamma))
+    return (R*xangular, R*yangular, lookangle)
 
 def cartesian_to_eta_xi(x,y,z):
     rho = np.sqrt(x**2 + y**2 + z**2)
