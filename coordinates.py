@@ -1,3 +1,4 @@
+#maison des idiots
 import math
 import numpy as np
 import matplotlib.pyplot as plt
@@ -6,6 +7,26 @@ from mpl_toolkits.mplot3d import Axes3D
 
 
 ## helper functions ##
+
+def eta_xi_to_satellite_centered_spherical(eta, xi):
+    # compute theta
+    theta = np.arcsin(np.sqrt(eta**2 + xi**2))
+    theta = np.pi - theta
+    
+    # compute phi
+    phi = np.arctan(eta/xi)
+    if eta < 0: # northern hemisphere
+        phi = phi + np.pi
+    if phi < 0:
+        phi = phi + 2*np.pi
+
+    # compute rho
+    rho = np.abs((R+h)*np.cos(theta) + np.sqrt(R^2 - (np.sin(theta)*(R+h))^2))
+    
+    return (rho, theta, phi)
+    
+def eta_xi_to_x_y(eta, xi):
+    pass
 
 def cartesian_to_eta_xi(x,y,z):
     rho = np.sqrt(x**2 + y**2 + z**2)
@@ -49,6 +70,19 @@ def rodrigues_rotation(v, axis, theta):
     return np.dot(rotation_matrix(axis, theta), v)
 
 
+def get_rotation_e3_to_new_orthonormal_basis(u,v,w):
+    M = np.zeros((3,3))
+    print(M)
+    print(u.shape)
+    M[:,0] = u
+    M[:,1] = v
+    M[:,2] = w
+    return M
+
+def get_rotation_on_basis_to_e3(u,v,w):
+    return get_rotation_e3_to_new_orthonormal_basis(u,v,w).T
+
+
 if __name__ == "__main__":
     # Geometric parameters
     Rearth = 6371 # radius of spherical earth (km)
@@ -72,12 +106,16 @@ if __name__ == "__main__":
     toward_north = toward_north / np.linalg.norm(toward_north)
     dir_2 = np.cross(toward_north, dir_1) #make dir_2 orthogonal
     point_2 = Rorbit*dir_2
-    
+    M = get_rotation_on_basis_to_e3(dir_1, dir_2, toward_north)
+
     xs_to_probe_deg = np.array([50, 60, 70, 80, 100, 110, 120, 130])
     xs_to_probe = xs_to_probe_deg * (2*np.pi/360.0)
     rotations_to_probe = np.pi/2.0 - xs_to_probe
     Nrot = len(rotations_to_probe)
-    
+   
+    second_disk = False
+    mapping = False
+
     # Set figures
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1, projection="3d")
@@ -85,9 +123,18 @@ if __name__ == "__main__":
     fig2 = plt.figure()
     ax2 = fig2.add_subplot(1,1,1)
 
-    fig3 = plt.figure()
-    ax3 = fig3.add_subplot(2,1,1, projection="3d")
-    ax4 = fig3.add_subplot(2,1,2)
+    if second_disk:
+        fig3 = plt.figure()
+        ax3 = fig3.add_subplot(2,1,1, projection="3d")
+        ax4 = fig3.add_subplot(2,1,2)
+    
+    if mapping:
+        fig4 = plt.figure()
+        ax5 = fig4.add_subplot(2,1,1)
+        ax6 = fig4.add_subplot(2,1,2)
+
+    fig5 = plt.figure()
+    ax7 = fig5.add_subplot(1,1,1, projection="3d")
 
     # Animated data generation
     def gen(period): # actual orbit in Cartesian coordinates
@@ -95,7 +142,6 @@ if __name__ == "__main__":
         while minutes < period:
             t = (2*np.pi)/period * minutes
             point = Rorbit * np.array([np.cos(t)*dir_1[0] + np.sin(t)*dir_2[0], np.cos(t)*dir_1[1] + np.sin(t)*dir_2[1], np.cos(t)*dir_1[2] + np.sin(t)*dir_2[2]])
-            print("ORBIT", Rorbit, np.linalg.norm(point))
             yield point
             minutes += 1
 
@@ -125,6 +171,14 @@ if __name__ == "__main__":
             yield np.array([eta, xi])
             minutes += 1
 
+    def gen5(period): # rotated orbit in Cartesian coordinates
+        minutes = 0
+        while minutes < period:
+            t = (2*np.pi)/period * minutes
+            point = Rorbit * np.dot(M, np.array([np.cos(t)*dir_1[0] + np.sin(t)*dir_2[0], np.cos(t)*dir_1[1] + np.sin(t)*dir_2[1], np.cos(t)*dir_1[2] + np.sin(t)*dir_2[2]]).reshape((3,1))).reshape((3,))
+            yield point
+            minutes += 1
+
     def gen6(period, angle): # trace with varying colatitude x (angle is the complement to the colatitude, ie the latitude pi/2 - x)
         minutes = 0
         while minutes < period:
@@ -132,11 +186,18 @@ if __name__ == "__main__":
             pt = Rearth * np.array([np.cos(t)*dir_1[0] + np.sin(t)*dir_2[0], np.cos(t)*dir_1[1] + np.sin(t)*dir_2[1], np.cos(t)*dir_1[2] + np.sin(t)*dir_2[2]])
             raxis = np.cross(pt, toward_north)
             rot = rodrigues_rotation(pt, raxis, angle)
-            print(np.linalg.norm(rot), np.linalg.norm(pt), Rorbit)
-            print(rot)
             yield rot
             minutes += 1
 
+    def gen7(period, angle): # rotated trace with varying colatitude x (angle is the complement to the colatitude, ie the latitude pi/2 - x)
+        minutes = 0
+        while minutes < period:
+            t = (2*np.pi)/period * minutes
+            pt = Rearth * np.dot(M, np.array([np.cos(t)*dir_1[0] + np.sin(t)*dir_2[0], np.cos(t)*dir_1[1] + np.sin(t)*dir_2[1], np.cos(t)*dir_1[2] + np.sin(t)*dir_2[2]]).reshape((3,1))).reshape((3,))
+            raxis = np.cross(pt, toward_north)
+            rot = rodrigues_rotation(pt, raxis, angle)
+            yield rot
+            minutes += 1
 
     # Update functions
     def update(num, data, line): # for the orbit
@@ -175,6 +236,21 @@ if __name__ == "__main__":
         lines3d.append(l)
         datas3d.append(d)
 
+    # orbit around rotated sphere
+    data7 = np.array(list(gen5(period))).T
+    line7, = ax7.plot(data7[0, 0:1], data7[1, 0:1], data7[2, 0:1])
+
+    # orbit echoes around sphere
+    lines3d_7 = []
+    datas3d_7 = []
+    for r in rotations_to_probe:
+        d = np.array(list(gen7(period, r))).T
+        print(d)
+        l, = ax.plot(d[0, 0:1], d[1, 0:1], d[2, 0:1])
+        lines3d_7.append(l)
+        datas3d_7.append(d)
+
+
     # orbit in xi-eta plane
     data2 = np.array(list(gen2(period))).T
     line2, = ax2.plot(data2[0,:], data2[1,:])
@@ -195,23 +271,26 @@ if __name__ == "__main__":
     y = Rearth * np.sin(u)*np.sin(v)
     z = Rearth * np.cos(v)
     ax.plot_wireframe(x, y, z, color="r", alpha=0.05)
-
+    
+    # rotated sphere
+    ax7.plot_wireframe(x, y, z, color="r", alpha=0.05)
+    
     # second sphere
-    print(z.shape, x.shape, y.shape)
-    print(x[z>=0].shape)
-    u, v = np.mgrid[0:2*np.pi:240j, 0:np.pi:120j]
-    x = Rearth * np.cos(u)*np.sin(v)
-    y = Rearth * np.sin(u)*np.sin(v)
-    z = Rearth * np.cos(v)
-    ax.plot_wireframe(x, y, z, color="r", alpha=0.05)
-    ax3.scatter(x[np.logical_and(z>=0, y>=0)], y[np.logical_and(z>=0, y>=0)], z[np.logical_and(z>=0, y>=0)], color='r', alpha=0.05)
-    ax3.scatter(x[np.logical_and(z<0, y>=0)], y[np.logical_and(z<0, y>=0)], z[np.logical_and(z<0, y>=0)], color='b', alpha=0.05)
-    ttt = np.logical_and(y < 0, np.logical_and(x>=0, z>=0))
-    uuu = np.logical_and(y < 0, np.logical_and(x<0, z>=0))
-    vvv = np.logical_and(y < 0, np.logical_and(x<0, z<0))
-    ax3.scatter(x[ttt], y[ttt], z[ttt], color='k', alpha=0.05)
-    ax3.scatter(x[uuu], y[uuu], z[uuu], color='m', alpha=0.05)
-    ax3.scatter(x[vvv], y[vvv], z[vvv], color='y', alpha=0.05)
+    if second_disk:
+        u, v = np.mgrid[0:2*np.pi:240j, 0:np.pi:120j]
+        x = Rearth * np.cos(u)*np.sin(v)
+        y = Rearth * np.sin(u)*np.sin(v)
+        z = Rearth * np.cos(v)
+        ax.plot_wireframe(x, y, z, color="r", alpha=0.05)
+        ax3.scatter(x[np.logical_and(z>=0, y>=0)], y[np.logical_and(z>=0, y>=0)], z[np.logical_and(z>=0, y>=0)], color='r', alpha=0.05)
+        ax3.scatter(x[np.logical_and(z<0, y>=0)], y[np.logical_and(z<0, y>=0)], z[np.logical_and(z<0, y>=0)], color='b', alpha=0.05)
+        ttt = np.logical_and(y < 0, np.logical_and(x>=0, z>=0))
+        uuu = np.logical_and(y < 0, np.logical_and(x<0, z>=0))
+        vvv = np.logical_and(y < 0, np.logical_and(x<0, z<0))
+        ax3.scatter(x[ttt], y[ttt], z[ttt], color='k', alpha=0.05)
+        ax3.scatter(x[uuu], y[uuu], z[uuu], color='m', alpha=0.05)
+        ax3.scatter(x[vvv], y[vvv], z[vvv], color='y', alpha=0.05)
+    
     # fixed points on sphere/orbit 
     ax.scatter([0], [0], [0], color="b", s=10) #origin 
     ax.scatter([point_midtrace[0]], [point_midtrace[1]], [point_midtrace[2]], color='k', s=2) # midpoint of trace
@@ -219,6 +298,13 @@ if __name__ == "__main__":
     ax.scatter([point_1[0]], [point_1[1]], [point_1[2]], color="g", s=8) # random point 1
     ax.scatter([point_2[0]], [point_2[1]], [point_2[2]], color="g", s=8) # random point 2
     
+    # fixed points on rotated sphere/orbit
+    rotated_p1 = np.dot(M, point_1.reshape((3,1))).reshape((3,))
+    rotated_p2 = np.dot(M, point_2.reshape((3,1))).reshape((3,))
+    ax7.scatter([0], [0], [0], color="b", s=10) #origin
+    ax7.scatter([rotated_p1[0]], [rotated_p1[1]], [rotated_p1[2]], color="g", s=8) # random point 1
+    ax7.scatter([rotated_p2[0]], [rotated_p2[1]], [rotated_p2[2]], color="g", s=8) # random point 2
+
     # unit disk in eta/xi plane
     tt = np.linspace(0, 2*np.pi, 1000)
     ax2.plot(np.cos(tt), np.sin(tt), linewidth=1, alpha = 0.33)
@@ -234,54 +320,67 @@ if __name__ == "__main__":
     ax2.scatter([eta], [xi], color='k', s=2)
 
     # second disk
-    ax4.plot(np.cos(tt), np.sin(tt), linewidth=1, alpha = 0.33)
-    etas = np.zeros(len(x[np.logical_and(z>=0, y>=0)]),)
-    xis = np.zeros(len(x[np.logical_and(z>=0, y>=0)]),)
-    i=0
-    for xx, yy, zz in zip(x[np.logical_and(z>=0, y>=0)],y[np.logical_and(z>=0, y>=0)],z[np.logical_and(z>=0, y>=0)]):
-        (eta, xi) = cartesian_to_eta_xi(xx,yy,zz)
-        etas[i] = eta
-        xis[i] = xi
-        i+=1
-    ax4.scatter(etas, xis, color='r', alpha=0.05)
-    etas = np.zeros(len(x[np.logical_and(z<0, y>=0)]),)
-    xis = np.zeros(len(x[np.logical_and(z<0, y>=0)]),)
-    i=0
-    for xx, yy, zz in zip(x[np.logical_and(z<0, y>=0)],y[np.logical_and(z<0, y>=0)],z[np.logical_and(z<0, y>=0)]):
-        (eta, xi) = cartesian_to_eta_xi(xx,yy,zz)
-        etas[i] = eta
-        xis[i] = xi
-        i+=1
-    ax4.scatter(etas, xis, color='b', alpha=0.05)
-    etas = np.zeros(len(x[ttt]),)
-    xis = np.zeros(len(x[ttt]),)
-    i=0
-    for xx, yy, zz in zip(x[ttt],y[ttt],z[ttt]):
-        (eta, xi) = cartesian_to_eta_xi(xx,yy,zz)
-        etas[i] = eta
-        xis[i] = xi
-        i+=1
-    ax4.scatter(etas, xis, color='k', alpha=0.05)
-    etas = np.zeros(len(x[uuu]),)
-    xis = np.zeros(len(x[uuu]),)
-    i=0
-    for xx, yy, zz in zip(x[uuu],y[uuu],z[uuu]):
-        (eta, xi) = cartesian_to_eta_xi(xx,yy,zz)
-        etas[i] = eta
-        xis[i] = xi
-        i+=1
-    ax4.scatter(etas, xis, color='m', alpha=0.05)
-    etas = np.zeros(len(x[vvv]),)
-    xis = np.zeros(len(x[vvv]),)
-    i=0
-    for xx, yy, zz in zip(x[vvv],y[vvv],z[vvv]):
-        (eta, xi) = cartesian_to_eta_xi(xx,yy,zz)
-        etas[i] = eta
-        xis[i] = xi
-        i+=1
-    ax4.scatter(etas, xis, color='y', alpha=0.05)
+    if second_disk:
+        ax4.plot(np.cos(tt), np.sin(tt), linewidth=1, alpha = 0.33)
+        etas = np.zeros(len(x[np.logical_and(z>=0, y>=0)]),)
+        xis = np.zeros(len(x[np.logical_and(z>=0, y>=0)]),)
+        i=0
+        for xx, yy, zz in zip(x[np.logical_and(z>=0, y>=0)],y[np.logical_and(z>=0, y>=0)],z[np.logical_and(z>=0, y>=0)]):
+            (eta, xi) = cartesian_to_eta_xi(xx,yy,zz)
+            etas[i] = eta
+            xis[i] = xi
+            i+=1
+        ax4.scatter(etas, xis, color='r', alpha=0.05)
+        etas = np.zeros(len(x[np.logical_and(z<0, y>=0)]),)
+        xis = np.zeros(len(x[np.logical_and(z<0, y>=0)]),)
+        i=0
+        for xx, yy, zz in zip(x[np.logical_and(z<0, y>=0)],y[np.logical_and(z<0, y>=0)],z[np.logical_and(z<0, y>=0)]):
+            (eta, xi) = cartesian_to_eta_xi(xx,yy,zz)
+            etas[i] = eta
+            xis[i] = xi
+            i+=1
+        ax4.scatter(etas, xis, color='b', alpha=0.05)
+        etas = np.zeros(len(x[ttt]),)
+        xis = np.zeros(len(x[ttt]),)
+        i=0
+        for xx, yy, zz in zip(x[ttt],y[ttt],z[ttt]):
+            (eta, xi) = cartesian_to_eta_xi(xx,yy,zz)
+            etas[i] = eta
+            xis[i] = xi
+            i+=1
+        ax4.scatter(etas, xis, color='k', alpha=0.05)
+        etas = np.zeros(len(x[uuu]),)
+        xis = np.zeros(len(x[uuu]),)
+        i=0
+        for xx, yy, zz in zip(x[uuu],y[uuu],z[uuu]):
+            (eta, xi) = cartesian_to_eta_xi(xx,yy,zz)
+            etas[i] = eta
+            xis[i] = xi
+            i+=1
+        ax4.scatter(etas, xis, color='m', alpha=0.05)
+        etas = np.zeros(len(x[vvv]),)
+        xis = np.zeros(len(x[vvv]),)
+        i=0
+        for xx, yy, zz in zip(x[vvv],y[vvv],z[vvv]):
+            (eta, xi) = cartesian_to_eta_xi(xx,yy,zz)
+            etas[i] = eta
+            xis[i] = xi
+            i+=1
+        ax4.scatter(etas, xis, color='y', alpha=0.05)
+    
+    if mapping:
+        # second disk plot
+        nx, ny = (50, 50)
+        xx = np.linspace(-.99, .99, nx)
+        yy = np.linspace(-.99, .99, ny)
+        xx, yy = np.meshgrid(xx, yy)
+        xx = xx.flatten()
+        yy = yy.flatten()
+        ax5.scatter(xx, yy, color = 'b', alpha = 0.5)
 
-
+        yvals = np.arctan(np.divide(yy, xx))
+        zvals = np.arccos(np.sqrt(np.power(yy, 2) + np.power(xx,2)))
+        ax6.scatter(zvals, yvals, color='b', alpha=0.5)
 
     # Set the axes properties
     ax.set_xlabel('X')
@@ -293,11 +392,21 @@ if __name__ == "__main__":
 
     ax2.set_xlabel('eta')
     ax2.set_ylabel('xi')
+    
+    if second_disk:
+        ax4.set_xlabel('eta')
+        ax4.set_ylabel('xi')
 
-    ax4.set_xlabel('eta')
-    ax2.set_ylabel('xi')
+    ax7.set_xlabel('X')
+    ax7.set_xlim([-1.10*Rorbit, 1.10*Rorbit])
+    ax7.set_ylabel('Y')
+    ax7.set_ylim([-1.10*Rorbit, 1.10*Rorbit])
+    ax7.set_zlabel('Z')
+    ax7.set_zlim([-1.10*Rorbit, 1.10*Rorbit])
+
 
     # Animate
+    # first sphere
     ani1 = FuncAnimation(fig, update, int(period), fargs=(data, line), blit=False)
     ani_0 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[0], lines3d[0]), blit=False)
     ani_1 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[1], lines3d[1]), blit=False)
@@ -307,8 +416,19 @@ if __name__ == "__main__":
     ani_5 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[5], lines3d[5]), blit=False)
     ani_6 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[6], lines3d[6]), blit=False)
     ani_7 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[7], lines3d[7]), blit=False)
-    #for d, l in zip(datas3d, lines3d):
-    #    ani_ = FuncAnimation(fig, update3, int(period), fargs=(d, l), blit=False)
+    
+    # rotated sphere 
+    a1 = FuncAnimation(fig5, update, int(period), fargs=(data7, line7), blit=False)
+    a_0 = FuncAnimation(fig5, update3, int(period), fargs=(datas3d_7[0], lines3d_7[0]), blit=False)
+    a_1 = FuncAnimation(fig5, update3, int(period), fargs=(datas3d_7[1], lines3d_7[1]), blit=False)
+    a_2 = FuncAnimation(fig5, update3, int(period), fargs=(datas3d_7[2], lines3d_7[2]), blit=False)
+    a_3 = FuncAnimation(fig5, update3, int(period), fargs=(datas3d_7[3], lines3d_7[3]), blit=False)
+    a_4 = FuncAnimation(fig5, update3, int(period), fargs=(datas3d_7[4], lines3d_7[4]), blit=False)
+    a_5 = FuncAnimation(fig5, update3, int(period), fargs=(datas3d_7[5], lines3d_7[5]), blit=False)
+    a_6 = FuncAnimation(fig5, update3, int(period), fargs=(datas3d_7[6], lines3d_7[6]), blit=False)
+    a_7 = FuncAnimation(fig5, update3, int(period), fargs=(datas3d_7[7], lines3d_7[7]), blit=False)
+
+    # disk
     ani2 = FuncAnimation(fig2, update2, int(period), fargs=(data2, line2), blit=False)
     an_0 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[0], lines2d[0]), blit=False)
     an_1 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[1], lines2d[1]), blit=False)
@@ -318,8 +438,8 @@ if __name__ == "__main__":
     an_5 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[5], lines2d[5]), blit=False)
     an_6 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[6], lines2d[6]), blit=False)
     an_7 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[7], lines2d[7]), blit=False)
-    #for d, l in zip(datas2d, lines2d):
-    #    ani_ = FuncAnimation(fig2, update4, int(period), fargs=(d, l), blit=False)
+    
     #ani.save('matplot003.gif', writer='imagemagick')
+    
     plt.show() 
 
