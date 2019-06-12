@@ -389,19 +389,6 @@ if __name__ == "__main__":
     tt = np.linspace(0, 2*np.pi, 1000)
     ax2.plot(np.cos(tt), np.sin(tt), linewidth=1, alpha = 0.33)
 
-    # fixed points in eta/xi plane
-    eta, xi = cartesian_to_eta_xi(*point_1) # random point 1
-    ax2.scatter([eta], [xi], color='g', s=8)
-    eta, xi = cartesian_to_eta_xi(*point_2) # random point 2
-    ax2.scatter([eta], [xi], color='g', s=8)
-    if show_midpoints:
-        eta, xi = cartesian_to_eta_xi(*point_midtrace) # midtrace point 
-        ax2.scatter([eta], [xi], color='k', s=2)
-        eta, xi = cartesian_to_eta_xi(*other_point_midtrace) # midtrace point 
-        ax2.scatter([eta], [xi], color='k', s=2)
-    eta, xi = cartesian_to_eta_xi(*obs_point) # obs point
-    ax2.scatter([eta], [xi], color='m', s=8)
-
     # second disk
     if second_disk:
         ax4.plot(np.cos(tt), np.sin(tt), linewidth=1, alpha = 0.33)
