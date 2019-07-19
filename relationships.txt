@@ -1,0 +1,33 @@
+\rho \sin u = R \sin \gamma = d_y^2 + d_z^2
+
+|\sin (\pi - \theta)| = |\sin \theta| = \frac{|d_z|}{d_y^2 + d_z^2}
+
+Indeed, the first of Napier's rules holds. Since $\cos y_{angular} = \frac{R-|d_x|}{\sqrt{(R-|d_x|^2 +|d_y|^2}}$ and $\cos x_{angular} = \frac{\sqrt{(R-|d_x|^2 +|d_y|^2}}{R}$, it follows that $\cos \gamma = \frac{R-|d_x|}{R} = \cos y_{angular} \cdot \cos x_{angular}$.
+
+R-|d_x| = R \cos \gamma
+
+
+a + b = 90 + v
+
+sin gamma / X = sin a/R = sin 180-a-gamma/R
+-> x = R sin gamma/sin a
+
+
+
+
+
+
+
+sin u/x = sin b/h = sin (180-u-b)/rho
+-> x = h sin u/sin b
+
+--> R sin gamma / sin a = h sin u / sin b
+
+sin gamma/hsina = sinu/Rsinb = sin gamma/(rho sin b)
+
+
+
+
+sin a+b / R+h = sin gamma/rho = sin u /R
+
+
