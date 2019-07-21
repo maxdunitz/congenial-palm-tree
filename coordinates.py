@@ -176,7 +176,7 @@ def geocentric_obs_and_geocentric_sat_to_everything(dir_1, dir_2, M, minutes):
     x = np.sign(dz)*R*x_ang
     y = np.sign(dy)*R*y_ang
 
-
+    return [eta, xi, x, y, rho, theta, phi, visible_flag]
 
 
 def cartesian_to_eta_xi(x,y,z):
@@ -321,90 +321,7 @@ if __name__ == "__main__":
     def gen2(period): # eta, xi
         minutes = 0
         while minutes < period:
-            t = (2*np.pi)/period * minutes
-            sat_loc_geocentric = Rorbit * np.array([np.cos(t)*dir_1[0] + np.sin(t)*dir_2[0], np.cos(t)*dir_1[1] + np.sin(t)*dir_2[1], np.cos(t)*dir_1[2] + np.sin(t)*dir_2[2]])
-            ##sat_loc_geocentric_after_rot = np.dot(M,sat_loc_geocentric)
-            ##obs_point_after_rot = np.dot(M,obs_point.reshape((3,1)))
-            ##dir_to_sat = sat_loc_geocentric_after_rot
-            ## rotate OBS and SAT so that SAT is along the positive x-axis
-            ### get rotation angle
-            ##rot_angle = np.arccos(dir_to_sat[0]) if dir_to_sat[1] >= 0 else 2.0*np.pi-np.arccos(dir_to_sat[0])
-            ##rot_mat = np.array([[np.cos(rot_angle),-1.0*np.sin(rot_angle),0],[np.sin(rot_angle),np.cos(rot_angle),0],[0,0,1]])
-            ##rotated_sat = np.dot(rot_mat,Rorbit*dir_to_sat.reshape((3,1))).reshape((3,))
-            ##rotated_obs = np.dot(rot_mat,obs_point_after_rot.reshape((3,1))).reshape((3,))
-            ##print(rotated_sat) #should be Rorbit,0,0
-            
-            ##rho,theta,phi = geocentric_Cartesian_to_satellite_centered_spherical(*rotated_obs)
-            ##eta, xi = spherical_to_eta_xi(rho, theta, phi)
-            ##x,y = eta_xi_to_x_y(eta, xi)
-            #print("ERROR:", abs(rr-rho))
-            
-            obs_loc_geocentric = obs_point ## relative to an arbitrary prime meridian, not the CTR-SAT line.
-            # solution two: compute parameters directly after rotating satelliteorbit into xy-plane
-            sat_loc_geocentric = np.dot(M, sat_loc_geocentric)
-            obs_loc_geocentric = np.dot(M, obs_loc_geocentric)
-            
-            
-            rho = np.sqrt(sum(x**2 for x in (sat_loc_geocentric-obs_loc_geocentric)))
-            # a^2 = b^2 + c^2 - 2bc cos a
-            #R**2 = rho**2 + (R+h)**2 - 2*rho*(R+H)*cos u
-            #2*rho*(R+h)*cos u = rho**2 + (R+h)**2 - R**2
-
-            u = np.arccos((rho**2 + (R+h)**2 - R**2)/(2.0*rho*(R+h)))
-            theta = np.pi - u
-            
-            # find gamma:
-            #sin u / R = sin gamma/rho
-            gamma = np.arcsin(rho * np.sin(u) / R) ## assumes observed point is observable
-            # check that gamma is the same as computed using dot product
-            gamma_2 = np.arccos(np.dot(obs_loc_geocentric, sat_loc_geocentric)/(R*(R+h)))
-            print("GAMMA", gamma, gamma_2)
-
-
-            # find length CTR-P_x
-            ctr_px = R * np.cos(gamma)
-
-            # find dx
-            dx = R - ctr_px
-            print("dx", dx, R-obs_loc_geocentric[0])
-
-            # find sqrt(dy**2+d_z**2)
-            dy_dz_hyp = R*np.sin(gamma)
-            
-            # find P_xy
-            P_xy = np.array([obs_loc_geocentric[0], obs_loc_geocentric[1], 0])
-            
-            # find d_y
-            dy = obs_loc_geocentric[1] - sat_loc_geocentric[1]
-
-            # find d_z
-            dz = obs_loc_geocentric[2]
-
-            phi_prime = np.arccos(np.abs(dy)/dy_dz_hyp)
-            
-            # if dy > 0, phi in [0, pi), else, phi in (pi,2pi)
-            # if dz > 0, phi in (pi/2,3pi/2) else phi in (3pi/2,2pi) U (0,pi/2)
-            
-            if dy > 0 and dz > 0:
-                phi = np.pi/2 + phi_prime
-            elif dy > 0 and dz < 0:
-                phi = np.pi/2 - phi_prime
-            elif dy < 0 and dz > 0:
-                phi = 3*np.pi/2 - phi_prime
-            elif dy < 0 and dz < 0:
-                phi = 2*np.pi - phi_prime
-
-            visible_flag = is_visible(theta)
-            
-            eta, xi = spherical_to_eta_xi(rho, theta, phi)
-            
-            x_ang = np.arcsin(np.abs(dz)/R)
-            y_ang = np.arcsin(np.abs(dy)/(np.sqrt(dy**2 + ctr_px**2)))
-
-            x = np.sign(dz)*R*x_ang
-            y = np.sign(dy)*R*y_ang
-
-            yield np.array([eta, xi, x, y, rho, theta, phi, visible_flag])
+            yield np.array(geocentric_obs_and_geocentric_sat_to_everything(dir_1, dir_2, M, minutes))
             minutes += 1
 
     def gen3(period): # y in the eta, xi plane along the orbit
