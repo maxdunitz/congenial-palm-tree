@@ -5,6 +5,37 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
 
+def mpl_sphere(image_file):
+    img_big = plt.imread(image_file)
+
+    # define a grid matching the map size, subsample along with pixels
+    theta = np.linspace(0, np.pi, img_big.shape[0])
+    phi = np.linspace(0, 2*np.pi, img_big.shape[1])
+
+    count = 180 # keep 180 points along theta and phi
+    theta_inds = np.linspace(0, img_big.shape[0] - 1, count).round().astype(int)
+    phi_inds = np.linspace(0, img_big.shape[1] - 1, count).round().astype(int)
+    theta = theta[theta_inds]
+    phi = phi[phi_inds]
+    img = img_big[np.ix_(theta_inds, phi_inds)]
+
+    theta,phi = np.meshgrid(theta, phi)
+    R = 6371
+
+    # sphere
+    x = R * np.sin(theta) * np.cos(phi)
+    y = R * np.sin(theta) * np.sin(phi)
+    z = R * np.cos(theta)
+
+    # create 3d Axes
+    fig9 = plt.figure()
+    ax9 = fig9.add_subplot(111, projection='3d')
+    ax9.plot_surface(x.T, y.T, z.T, facecolors=img/255, cstride=1, rstride=1) # we've already pruned ourselves
+    plt.axis('off')
+    #make the plot more spherical
+    ax9.axis('scaled')
+    return (x,y,z,img,img_big,ax9)
+
 
 ## helper functions ##
 
@@ -24,7 +55,8 @@ def eta_xi_to_satellite_centered_spherical(eta, xi):
     rho = np.abs((R+h)*np.cos(theta) + np.sqrt(R**2 - (np.sin(theta)*(R+h))**2))
     
     return (rho, theta, phi)
-    
+
+
 def eta_xi_to_satellite_centered_Cartesian(eta, xi):
     zeta = np.sqrt(1-xi**2-eta**2)
     second_term = np.sqrt(R**2-(R+h)**2*(xi**2+eta**2))
@@ -69,6 +101,83 @@ def eta_xi_to_x_y(eta, xi):
     #gamma = np.arccos(np.cos(xangular)*np.cos(yangular))
     #lookangle = np.arccos((R+h)/rho * np.sin(gamma))
     #return (R*xangular, R*yangular, lookangle, rho)
+
+def geocentric_obs_and_geocentric_sat_to_everything(dir_1, dir_2, M, minutes):
+    t = (2*np.pi)/period * minutes
+    sat_loc_geocentric = Rorbit * np.array([np.cos(t)*dir_1[0] + np.sin(t)*dir_2[0], np.cos(t)*dir_1[1] + np.sin(t)*dir_2[1], np.cos(t)*dir_1[2] + np.sin(t)*dir_2[2]])
+    obs_loc_geocentric = obs_point ## relative to an arbitrary prime meridian, not the CTR-SAT line.
+    
+    # Rotate satellite orbit into xy-plane
+    sat_loc_geocentric = np.dot(M, sat_loc_geocentric)
+    obs_loc_geocentric = np.dot(M, obs_loc_geocentric)
+
+    # compute rho using Euclidean distance
+    rho = np.sqrt(sum(x**2 for x in (sat_loc_geocentric-obs_loc_geocentric)))
+            
+    # compute theta using law of cosines
+    # a^2 = b^2 + c^2 - 2bc cos a
+    #R**2 = rho**2 + (R+h)**2 - 2*rho*(R+H)*cos u
+    #2*rho*(R+h)*cos u = rho**2 + (R+h)**2 - R**2
+    u = np.arccos((rho**2 + (R+h)**2 - R**2)/(2.0*rho*(R+h)))
+    theta = np.pi - u
+
+    # find gamma using law of sines, assuming the observed point is observable
+    #sin u / R = sin gamma/rho
+    gamma = np.arcsin(rho * np.sin(u) / R) ## assumes observed point is observable
+    # check that gamma is the same as computed using dot product
+    gamma_2 = np.arccos(np.dot(obs_loc_geocentric, sat_loc_geocentric)/(R*(R+h)))
+    print("GAMMA", gamma, gamma_2)
+
+
+    # find length CTR-P_x
+    ctr_px = R * np.cos(gamma)
+
+    # find dx
+    dx = R - ctr_px
+    print("dx", dx, R-obs_loc_geocentric[0])
+
+    # find sqrt(dy**2+d_z**2)
+    dy_dz_hyp = R*np.sin(gamma)
+
+    # find P_xy, knowing satellite orbit is in xy-plane
+    P_xy = np.array([obs_loc_geocentric[0], obs_loc_geocentric[1], 0])
+
+    # find d_y
+    dy = obs_loc_geocentric[1] - sat_loc_geocentric[1]
+
+    # find d_z, knowing satellite orbit is in xy-plane
+    dz = obs_loc_geocentric[2]
+
+    #compute phi
+    phi_prime = np.arccos(np.abs(dy)/dy_dz_hyp)
+
+    # if dy > 0, phi in [0, pi), else, phi in (pi,2pi)
+    # if dz > 0, phi in (pi/2,3pi/2) else phi in (3pi/2,2pi) U (0,pi/2)
+
+    if dy > 0 and dz > 0:
+        phi = np.pi/2 + phi_prime
+    elif dy > 0 and dz < 0:
+        phi = np.pi/2 - phi_prime
+    elif dy < 0 and dz > 0:
+        phi = 3*np.pi/2 - phi_prime
+    elif dy < 0 and dz < 0:
+        phi = 2*np.pi - phi_prime
+
+    # is the observed point observable?
+    visible_flag = is_visible(theta)
+
+    # get direction cosines
+    eta, xi = spherical_to_eta_xi(rho, theta, phi)
+
+    # compute x and y coordinates
+    x_ang = np.arcsin(np.abs(dz)/R)
+    y_ang = np.arcsin(np.abs(dy)/(np.sqrt(dy**2 + ctr_px**2)))
+
+    x = np.sign(dz)*R*x_ang
+    y = np.sign(dy)*R*y_ang
+
+
+
 
 def cartesian_to_eta_xi(x,y,z):
     rho = np.sqrt(x**2 + y**2 + z**2)
@@ -128,8 +237,8 @@ def is_visible(theta):
     print(R, h, "Seuil", np.pi - np.arcsin(R/(R+h)))
     return theta >= (np.pi - np.arcsin(R/(R+h)))
 
-
 if __name__ == "__main__":
+
     # Geometric parameters
     R = 6371 # radius of spherical earth (km)
     h = 687 # altitude of satellite (km)
@@ -176,7 +285,8 @@ if __name__ == "__main__":
     # Set figures
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1, projection="3d")
-    
+    ax.view_init(azim=0,elev=0)
+
     fig2 = plt.figure()
     ax2 = fig2.add_subplot(1,1,1)
 
@@ -196,6 +306,8 @@ if __name__ == "__main__":
     figxy = plt.figure()
     axxy = figxy.add_subplot(1,1,1)
 
+    figrho = plt.figure()
+    axrho = figrho.add_subplot(1,1,1)
 
     # Animated data generation
     def gen(period): # actual orbit in Cartesian coordinates
@@ -210,22 +322,89 @@ if __name__ == "__main__":
         minutes = 0
         while minutes < period:
             t = (2*np.pi)/period * minutes
-            sat_loc_geocentric = np.array([np.cos(t)*dir_1[0] + np.sin(t)*dir_2[0], np.cos(t)*dir_1[1] + np.sin(t)*dir_2[1], np.cos(t)*dir_1[2] + np.sin(t)*dir_2[2]])
-            sat_loc_geocentric_after_rot = np.dot(M,sat_loc_geocentric)
-            obs_point_after_rot = np.dot(M,obs_point.reshape((3,1)))
-            dir_to_sat = sat_loc_geocentric_after_rot
+            sat_loc_geocentric = Rorbit * np.array([np.cos(t)*dir_1[0] + np.sin(t)*dir_2[0], np.cos(t)*dir_1[1] + np.sin(t)*dir_2[1], np.cos(t)*dir_1[2] + np.sin(t)*dir_2[2]])
+            ##sat_loc_geocentric_after_rot = np.dot(M,sat_loc_geocentric)
+            ##obs_point_after_rot = np.dot(M,obs_point.reshape((3,1)))
+            ##dir_to_sat = sat_loc_geocentric_after_rot
             ## rotate OBS and SAT so that SAT is along the positive x-axis
-            # get rotation angle
-            rot_angle = np.arccos(dir_to_sat[0]) if dir_to_sat[1] >= 0 else 2.0*np.pi-np.arccos(dir_to_sat[0])
-            rot_mat = np.array([[np.cos(rot_angle),-1.0*np.sin(rot_angle),0],[np.sin(rot_angle),np.cos(rot_angle),0],[0,0,1]])
-            rotated_sat = np.dot(rot_mat,Rorbit*dir_to_sat.reshape((3,1))).reshape((3,))
-            rotated_obs = np.dot(rot_mat,obs_point_after_rot.reshape((3,1))).reshape((3,))
-            print(rotated_sat) #should be Rorbit,0,0
-            rho,theta,phi = geocentric_Cartesian_to_satellite_centered_spherical(*rotated_obs)
-            eta, xi = spherical_to_eta_xi(rho, theta, phi)
-            x,y = eta_xi_to_x_y(eta, xi)
+            ### get rotation angle
+            ##rot_angle = np.arccos(dir_to_sat[0]) if dir_to_sat[1] >= 0 else 2.0*np.pi-np.arccos(dir_to_sat[0])
+            ##rot_mat = np.array([[np.cos(rot_angle),-1.0*np.sin(rot_angle),0],[np.sin(rot_angle),np.cos(rot_angle),0],[0,0,1]])
+            ##rotated_sat = np.dot(rot_mat,Rorbit*dir_to_sat.reshape((3,1))).reshape((3,))
+            ##rotated_obs = np.dot(rot_mat,obs_point_after_rot.reshape((3,1))).reshape((3,))
+            ##print(rotated_sat) #should be Rorbit,0,0
+            
+            ##rho,theta,phi = geocentric_Cartesian_to_satellite_centered_spherical(*rotated_obs)
+            ##eta, xi = spherical_to_eta_xi(rho, theta, phi)
+            ##x,y = eta_xi_to_x_y(eta, xi)
             #print("ERROR:", abs(rr-rho))
-            yield np.array([eta, xi, x, y])#[eta, xi, rho, theta, phi, x, y])
+            
+            obs_loc_geocentric = obs_point ## relative to an arbitrary prime meridian, not the CTR-SAT line.
+            # solution two: compute parameters directly after rotating satelliteorbit into xy-plane
+            sat_loc_geocentric = np.dot(M, sat_loc_geocentric)
+            obs_loc_geocentric = np.dot(M, obs_loc_geocentric)
+            
+            
+            rho = np.sqrt(sum(x**2 for x in (sat_loc_geocentric-obs_loc_geocentric)))
+            # a^2 = b^2 + c^2 - 2bc cos a
+            #R**2 = rho**2 + (R+h)**2 - 2*rho*(R+H)*cos u
+            #2*rho*(R+h)*cos u = rho**2 + (R+h)**2 - R**2
+
+            u = np.arccos((rho**2 + (R+h)**2 - R**2)/(2.0*rho*(R+h)))
+            theta = np.pi - u
+            
+            # find gamma:
+            #sin u / R = sin gamma/rho
+            gamma = np.arcsin(rho * np.sin(u) / R) ## assumes observed point is observable
+            # check that gamma is the same as computed using dot product
+            gamma_2 = np.arccos(np.dot(obs_loc_geocentric, sat_loc_geocentric)/(R*(R+h)))
+            print("GAMMA", gamma, gamma_2)
+
+
+            # find length CTR-P_x
+            ctr_px = R * np.cos(gamma)
+
+            # find dx
+            dx = R - ctr_px
+            print("dx", dx, R-obs_loc_geocentric[0])
+
+            # find sqrt(dy**2+d_z**2)
+            dy_dz_hyp = R*np.sin(gamma)
+            
+            # find P_xy
+            P_xy = np.array([obs_loc_geocentric[0], obs_loc_geocentric[1], 0])
+            
+            # find d_y
+            dy = obs_loc_geocentric[1] - sat_loc_geocentric[1]
+
+            # find d_z
+            dz = obs_loc_geocentric[2]
+
+            phi_prime = np.arccos(np.abs(dy)/dy_dz_hyp)
+            
+            # if dy > 0, phi in [0, pi), else, phi in (pi,2pi)
+            # if dz > 0, phi in (pi/2,3pi/2) else phi in (3pi/2,2pi) U (0,pi/2)
+            
+            if dy > 0 and dz > 0:
+                phi = np.pi/2 + phi_prime
+            elif dy > 0 and dz < 0:
+                phi = np.pi/2 - phi_prime
+            elif dy < 0 and dz > 0:
+                phi = 3*np.pi/2 - phi_prime
+            elif dy < 0 and dz < 0:
+                phi = 2*np.pi - phi_prime
+
+            visible_flag = is_visible(theta)
+            
+            eta, xi = spherical_to_eta_xi(rho, theta, phi)
+            
+            x_ang = np.arcsin(np.abs(dz)/R)
+            y_ang = np.arcsin(np.abs(dy)/(np.sqrt(dy**2 + ctr_px**2)))
+
+            x = np.sign(dz)*R*x_ang
+            y = np.sign(dy)*R*y_ang
+
+            yield np.array([eta, xi, x, y, rho, theta, phi, visible_flag])
             minutes += 1
 
     def gen3(period): # y in the eta, xi plane along the orbit
@@ -303,7 +482,7 @@ if __name__ == "__main__":
     # Compute animation
     # orbit around sphere
     data = np.array(list(gen(period))).T
-    line, = ax.plot(data[0, 0:1], data[1, 0:1], data[2, 0:1])
+    line, = ax.plot(data[0, 0:1], data[1, 0:1], data[2, 0:1], color='r')
     
     if show_echoes:
         # orbit echoes around sphere
@@ -311,13 +490,13 @@ if __name__ == "__main__":
         datas3d = []
         for r in rotations_to_probe:
             d = np.array(list(gen6(period, r))).T
-            l, = ax.plot(d[0, 0:1], d[1, 0:1], d[2, 0:1])
+            l, = ax.plot(d[0, 0:1], d[1, 0:1], d[2, 0:1], color='r')
             lines3d.append(l)
             datas3d.append(d)
 
     # orbit around rotated sphere
     data7 = np.array(list(gen5(period))).T
-    line7, = ax7.plot(data7[0, 0:1], data7[1, 0:1], data7[2, 0:1])
+    line7, = ax7.plot(data7[0, 0:1], data7[1, 0:1], data7[2, 0:1], color='r')
 
     if show_echoes:
         # orbit echoes around sphere
@@ -343,6 +522,9 @@ if __name__ == "__main__":
     y_data = data2[3,:]
     line2, = ax2.plot(eta_data, xi_data)
     linexy, = axxy.plot(x_data, y_data)
+    rho_data = data2[4,:]
+    theta_data = data2[5,:]
+    linerho, = axrho.plot(rho_data, theta_data)
     #line2, = ax2.plot(np.multiply(visible_mask,eta_data), np.multiply(visible_mask,xi_data))
 
 
@@ -359,14 +541,21 @@ if __name__ == "__main__":
             
     # Plot static info
     # sphere
-    u, v = np.mgrid[0:2*np.pi:960j, 0:np.pi:480j]
-    x = R * np.cos(u)*np.sin(v)
-    y = R * np.sin(u)*np.sin(v)
-    z = R * np.cos(v)
-    ax.plot_wireframe(x, y, z, color="r", alpha=0.05)
+    ##u, v = np.mgrid[0:2*np.pi:960j, 0:np.pi:480j]
+    ##x = R * np.cos(u)*np.sin(v)
+    ##y = R * np.sin(u)*np.sin(v)
+    ##z = R * np.cos(v)
     
+    image_file = 'equirectangular.jpg'
+    (x,y,z,img,img_big,ax9) = mpl_sphere(image_file)
+    ##ax.plot_wireframe(x.T, y.T, z.T, color="r", alpha=0.05)
+    print(x.shape, y.shape, z.shape, img.shape)
+    ax.plot_surface(x.T, y.T, z.T, facecolors=img/255, cstride=1, rstride=1)
+
     # rotated sphere
-    ax7.plot_wireframe(x, y, z, color="r", alpha=0.05)
+    ax7.plot_surface(x.T, y.T, z.T, facecolors=img/255, cstride=1, rstride=1)
+    ax7.view_init(azim=0, elev=0)
+    ##ax7.plot_wireframe(x, y, z, color="r", alpha=0.05)
     
     # second sphere
     if second_disk:
@@ -410,6 +599,10 @@ if __name__ == "__main__":
     tt = np.linspace(-R, R, 1000)
     axxy.plot(np.zeros((1000,)), tt)
     axxy.plot(tt, np.zeros((1000,)))
+
+    tt = np.linspace(-R, R, 1000)
+    axrho.plot(np.zeros((1000,)), tt)
+    axrho.plot(tt, np.zeros((1000,)))
 
     # second disk
     if second_disk:
@@ -488,6 +681,9 @@ if __name__ == "__main__":
     axxy.set_xlabel('x')
     axxy.set_ylabel('y')
 
+    axrho.set_xlabel('rho')
+    axrho.set_ylabel('theta')
+
     if second_disk:
         ax4.set_xlabel('eta')
         ax4.set_ylabel('xi')
@@ -503,6 +699,7 @@ if __name__ == "__main__":
     # Animate
     # first sphere
     ani1 = FuncAnimation(fig, update, int(period), fargs=(data, line), blit=False)
+    ani1.save('ani1.gif', writer='imagemagick', fps=10)
     if show_echoes:
         ani_0 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[0], lines3d[0]), blit=False)
         ani_1 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[1], lines3d[1]), blit=False)
@@ -515,6 +712,7 @@ if __name__ == "__main__":
     
     # rotated sphere 
     a1 = FuncAnimation(fig5, update, int(period), fargs=(data7, line7), blit=False)
+    a1.save('a1.gif', writer='imagemagick',fps=10)
     if show_echoes:
         a_0 = FuncAnimation(fig5, update3, int(period), fargs=(datas3d_7[0], lines3d_7[0]), blit=False)
         a_1 = FuncAnimation(fig5, update3, int(period), fargs=(datas3d_7[1], lines3d_7[1]), blit=False)
@@ -527,6 +725,7 @@ if __name__ == "__main__":
 
     # disk
     ani2 = FuncAnimation(fig2, update2, int(period), fargs=(data2, line2), blit=False)
+    ani2.save('ani2.gif', writer='imagemagick', fps=10)
     if show_echoes:
         an_0 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[0], lines2d[0]), blit=False)
         an_1 = FuncAnimation(fig2, update4, int(period), fargs=(datas2d[1], lines2d[1]), blit=False)
@@ -542,5 +741,9 @@ if __name__ == "__main__":
     # xy
     anixy = FuncAnimation(figxy, updatexy, int(period), fargs=(data2, linexy), blit=False)
 
-    plt.show() 
+    anixy.save('anixy.gif', writer='imagemagick', fps=10)
 
+    anirho = FuncAnimation(figrho, updatexy, int(period), fargs=(data2, linerho), blit=False)
+    anirho.sae('anirho.gif', writer='imagemagick', fps=10)
+
+    #plt.show() 
