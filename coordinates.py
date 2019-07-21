@@ -134,7 +134,6 @@ def geocentric_obs_and_geocentric_sat_to_everything(dir_1, dir_2, M, minutes):
 
     # find dx
     dx = R - ctr_px
-    print("dx", dx, R-obs_loc_geocentric[0])
 
     # find sqrt(dy**2+d_z**2)
     dy_dz_hyp = R*np.sin(gamma)
@@ -318,7 +317,7 @@ if __name__ == "__main__":
             yield point
             minutes += 1
 
-    def gen2(period): # eta, xi
+    def gen2(period): # get all coordinates of orbit
         minutes = 0
         while minutes < period:
             yield np.array(geocentric_obs_and_geocentric_sat_to_everything(dir_1, dir_2, M, minutes))
@@ -381,7 +380,7 @@ if __name__ == "__main__":
 
     def updatexy(num, data, line):
         line.set_data(data[2:, :num])
-        return line
+        return line,
 
     def update3(num, data, line): # for the orbit echoes (varying x)
         line.set_data(data[:2, :num])
@@ -428,21 +427,38 @@ if __name__ == "__main__":
 
 
     # orbit in xi-eta plane
-    data2 = np.array(list(gen2(period))).T
-    #visible_mask = is_visible(data2[3,:])
-    #nmbr = len(visible_mask)
-    #print("MASK",sum(visible_mask)/nmbr)
-    #visible_mask = visible_mask.reshape((nmbr,1))
-    eta_data = data2[0,:]#.reshape((nmbr,1))
-    xi_data = data2[1,:]#.reshape((nmbr,1))
-    x_data = data2[2,:]
-    y_data = data2[3,:]
-    line2, = ax2.plot(eta_data, xi_data)
+    data2 = np.array(list(gen2(period))).T ##[eta, xi, x, y, rho, theta, phi, visible_flag]
+    [nmbr,nfeat] = data2.T.shape
+    visible_mask = visible_flag = data2[7,:].reshape((nmbr,))
+    print("MASK",1.0*sum(visible_mask)/nmbr)
+    visible_mask = visible_mask.reshape((nmbr,1))
+    eta_data = data2[0,:].reshape((nmbr,1))
+    xi_data = data2[1,:].reshape((nmbr,1))
+    x_data = data2[2,:].reshape((nmbr,1))
+    y_data = data2[3,:].reshape((nmbr,1))
+    rho_data = data2[4,:].reshape((nmbr,1))
+    theta_data = data2[5,:].reshape((nmbr,1))
+    phi_data = data2[6,:].reshape((nmbr,1))
+    eta_data = np.multiply(eta_data,visible_mask).reshape((nmbr,))
+    xi_data = np.multiply(xi_data,visible_mask).reshape((nmbr,))
+    x_data = np.multiply(x_data,visible_mask).reshape((nmbr,))
+    y_data = np.multiply(y_data,visible_mask).reshape((nmbr,))
+    rho_data = np.multiply(rho_data,visible_mask).reshape((nmbr,))
+    theta_data = np.multiply(theta_data,visible_mask).reshape((nmbr,))
+    phi_data = np.multiply(phi_data,visible_mask).reshape((nmbr,))
+
+
+    #eta_data = data2[0,visible_mask]
+    #xi_data = data2[1,visible_mask]
+    #x_data = data2[2,visible_mask]
+    #y_data = data2[3,visible_mask]
+    #rho_data = data2[4,visible_mask]
+    #theta_data = data2[5,visible_mask]
+    #phi_data = data2[6,visible_mask]
+
+    line2, = ax2.plot(xi_data, eta_data)
     linexy, = axxy.plot(x_data, y_data)
-    rho_data = data2[4,:]
-    theta_data = data2[5,:]
     linerho, = axrho.plot(rho_data, theta_data)
-    #line2, = ax2.plot(np.multiply(visible_mask,eta_data), np.multiply(visible_mask,xi_data))
 
 
 
