@@ -2,8 +2,11 @@
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
+from scipy.ndimage.filters import generic_filter as gf
+
 
 def mpl_sphere(image_file):
     img_big = plt.imread(image_file)
@@ -39,7 +42,7 @@ def mpl_sphere(image_file):
 
 ## helper functions ##
 
-def eta_xi_to_satellite_centered_spherical(eta, xi):
+def eta_xi_to_satellite_centered_spherical(xi, eta):
     # compute theta
     theta = np.arcsin(np.sqrt(eta**2 + xi**2))
     theta = np.pi - theta
@@ -57,7 +60,7 @@ def eta_xi_to_satellite_centered_spherical(eta, xi):
     return (rho, theta, phi)
 
 
-def eta_xi_to_satellite_centered_Cartesian(eta, xi):
+def eta_xi_to_satellite_centered_Cartesian(xi, eta):
     zeta = np.sqrt(1-xi**2-eta**2)
     second_term = np.sqrt(R**2-(R+h)**2*(xi**2+eta**2))
     common_term = (R+h)*zeta - second_term
@@ -82,9 +85,9 @@ def geocentric_Cartesian_to_satellite_centered_spherical(x,y,z):
         phi = 2.0*np.pi - phi
     return (rho, theta, phi)
 
-def eta_xi_to_x_y(eta, xi):
-    rho,theta,phi = eta_xi_to_satellite_centered_spherical(eta, xi)
-    xsat, ysat, zsat = eta_xi_to_satellite_centered_Cartesian(eta,xi)
+def eta_xi_to_x_y(xi, eta):
+    rho,theta,phi = eta_xi_to_satellite_centered_spherical(xi, eta)
+    xsat, ysat, zsat = eta_xi_to_satellite_centered_Cartesian(xi,eta)
     xgeo, ygeo, zgeo = (R*np.cos(np.arcsin(np.sqrt(xsat**2+ysat**2)/R)), ysat, -xsat)
     xang = np.arcsin(zgeo/R)
     yang = np.arctan(ygeo/xgeo)
@@ -166,7 +169,7 @@ def geocentric_obs_and_geocentric_sat_to_everything(dir_1, dir_2, M, minutes):
     visible_flag = is_visible(theta)
 
     # get direction cosines
-    eta, xi = spherical_to_eta_xi(rho, theta, phi)
+    xi, eta = spherical_to_eta_xi(rho, theta, phi)
 
     # compute x and y coordinates
     x_ang = np.arcsin(np.abs(dz)/R)
@@ -182,12 +185,12 @@ def cartesian_to_eta_xi(x,y,z):
     rho = np.sqrt(x**2 + y**2 + z**2)
     xi = x / rho
     eta = y / rho
-    return (eta, xi)
+    return (xi, eta)
 
 def spherical_to_eta_xi(rho, theta, phi):
     eta = np.sin(theta)*np.cos(phi)
     xi = np.sin(theta)*np.sin(phi)
-    return (eta, xi)
+    return (xi, eta)
 
 def cartesian_to_spherical(x,y,z):
     rho = np.sqrt(x**2 + y**2 + z**2)
@@ -284,10 +287,59 @@ if __name__ == "__main__":
     # Set figures
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1, projection="3d")
-    ax.view_init(azim=0,elev=0)
+    ax.view_init(azim=45,elev=30)
 
     fig2 = plt.figure()
     ax2 = fig2.add_subplot(1,1,1)
+
+    figplan = plt.figure()
+    img=mpimg.imread('bluemarble1.jpg')
+    Nlat, Nlong, rgb = img.shape
+    pixels_per_radian = Nlat/np.pi
+    equator = int(Nlat/2)
+    assert(np.abs(pixels_per_radian - Nlong/(2*np.pi)) < 10e-5)
+    radius_in_radians = np.arcsin(R/(R+h))
+    radius_in_pixels = radius_in_radians * pixels_per_radian
+    radius_in_pixels = int(radius_in_pixels)
+    imglan = plt.imshow(img)
+    
+    # initialization function: plot the background of each frame
+    def init():
+        imglan.set_data(img)
+        return [imglan]
+
+    # animation function.  This is called sequentially
+    def animate(i):
+        long_ctr = int((i/period) * Nlong)
+        kernel = np.zeros((2*radius_in_pixels+1, 2*radius_in_pixels+1))
+        y,x = np.ogrid[-equator:Nlat-equator, -long_ctr:Nlong-long_ctr]
+        mask = x**2 + y**2 <= radius_in_pixels**2
+        im = imglan.get_array()
+        img_prime_0 = np.zeros((Nlat,Nlong))
+        img_prime_0[:,:] = im[:,:,0]
+        img_prime_1 = np.zeros((Nlat,Nlong))
+        img_prime_1[:,:] = im[:,:,1]
+        img_prime_2 = np.zeros((Nlat,Nlong))
+        img_prime_2[:,:] = im[:,:,2]
+        img_prime_0[mask] = 255
+        img_prime_1[mask] = 255
+        img_prime_2[mask] = 255
+        img_prime = np.zeros((Nlat,Nlong,3)).astype('uint8')
+        img_prime[:,:,0] = img_prime_0.astype('uint8')
+        img_prime[:,:,1] = img_prime_1.astype('uint8')
+        img_prime[:,:,2] = img_prime_2.astype('uint8')
+        imgo = imglan.set_array(img_prime)
+        ##circular_mean = gf(data, np.mean, footprint=kernel)
+        return [imgo]
+
+    anima = FuncAnimation(figplan, animate, init_func=init,
+                               frames=int(period), blit=False)
+
+    anima.save('planimation.gif', writer='imagemagick', fps=10)
+    #anim.save('basic_animation.mp4', fps=30, extra_args=['-vcodec', 'libx264'])
+
+
+    plt.show()
 
     if second_disk:
         fig3 = plt.figure()
@@ -323,21 +375,21 @@ if __name__ == "__main__":
             yield np.array(geocentric_obs_and_geocentric_sat_to_everything(dir_1, dir_2, M, minutes))
             minutes += 1
 
-    def gen3(period): # y in the eta, xi plane along the orbit
+    def gen3(period): # y in the xi, eta plane along the orbit
         minutes = 0
         max_ = 2*np.pi
         while minutes < period:
             yield minutes/period * max_
 
-    def gen4(period, angle): # eta, xi along arc (0.5 radian, y(t))
+    def gen4(period, angle): # xi, eta along arc (0.5 radian, y(t))
         minutes = 0
         while minutes < period:
             t = (2*np.pi)/period * minutes
             pt = R * np.array([np.cos(t)*dir_1[0] + np.sin(t)*dir_2[0], np.cos(t)*dir_1[1] + np.sin(t)*dir_2[1], np.cos(t)*dir_1[2] + np.sin(t)*dir_2[2]])
             raxis = np.cross(pt, toward_north)
             rotated_pt = rodrigues_rotation(pt, raxis, angle)
-            eta, xi = cartesian_to_eta_xi(*rotated_pt)
-            yield np.array([eta, xi])
+            xi, eta = cartesian_to_eta_xi(*rotated_pt)
+            yield np.array([xi, eta])
             minutes += 1
 
     def gen5(period): # rotated orbit in Cartesian coordinates
@@ -379,7 +431,11 @@ if __name__ == "__main__":
         return line,
 
     def updatexy(num, data, line):
-        line.set_data(data[2:, :num])
+        line.set_data(data[2:4, :num])
+        return line,
+
+    def updaterhotheta(num, data, line):
+        line.set_data(data[4:6, :num])
         return line,
 
     def update3(num, data, line): # for the orbit echoes (varying x)
@@ -387,6 +443,7 @@ if __name__ == "__main__":
         line.set_3d_properties(data[2, :num])
         line.set_color('k')
         line.set_alpha(0.2)
+        #return line,
 
     def update4(num, data, line): # for orbit echoes in the xi-eta plane 
         line.set_data(data[:2, :num])
@@ -479,7 +536,7 @@ if __name__ == "__main__":
     ##y = R * np.sin(u)*np.sin(v)
     ##z = R * np.cos(v)
     
-    image_file = 'equirectangular.jpg'
+    image_file = 'bluemarble1.jpg'#'equirectangular.jpg'
     (x,y,z,img,img_big,ax9) = mpl_sphere(image_file)
     ##ax.plot_wireframe(x.T, y.T, z.T, color="r", alpha=0.05)
     print(x.shape, y.shape, z.shape, img.shape)
@@ -487,7 +544,7 @@ if __name__ == "__main__":
 
     # rotated sphere
     ax7.plot_surface(x.T, y.T, z.T, facecolors=img/255, cstride=1, rstride=1)
-    ax7.view_init(azim=0, elev=0)
+    ax7.view_init(azim=45, elev=30)
     ##ax7.plot_wireframe(x, y, z, color="r", alpha=0.05)
     
     # second sphere
@@ -544,7 +601,7 @@ if __name__ == "__main__":
         xis = np.zeros(len(x[np.logical_and(z>=0, y>=0)]),)
         i=0
         for xx, yy, zz in zip(x[np.logical_and(z>=0, y>=0)],y[np.logical_and(z>=0, y>=0)],z[np.logical_and(z>=0, y>=0)]):
-            (eta, xi) = cartesian_to_eta_xi(xx,yy,zz)
+            (xi, eta) = cartesian_to_eta_xi(xx,yy,zz)
             etas[i] = eta
             xis[i] = xi
             i+=1
@@ -553,7 +610,7 @@ if __name__ == "__main__":
         xis = np.zeros(len(x[np.logical_and(z<0, y>=0)]),)
         i=0
         for xx, yy, zz in zip(x[np.logical_and(z<0, y>=0)],y[np.logical_and(z<0, y>=0)],z[np.logical_and(z<0, y>=0)]):
-            (eta, xi) = cartesian_to_eta_xi(xx,yy,zz)
+            (xi, eta) = cartesian_to_eta_xi(xx,yy,zz)
             etas[i] = eta
             xis[i] = xi
             i+=1
@@ -562,7 +619,7 @@ if __name__ == "__main__":
         xis = np.zeros(len(x[ttt]),)
         i=0
         for xx, yy, zz in zip(x[ttt],y[ttt],z[ttt]):
-            (eta, xi) = cartesian_to_eta_xi(xx,yy,zz)
+            (xi, eta) = cartesian_to_eta_xi(xx,yy,zz)
             etas[i] = eta
             xis[i] = xi
             i+=1
@@ -571,7 +628,7 @@ if __name__ == "__main__":
         xis = np.zeros(len(x[uuu]),)
         i=0
         for xx, yy, zz in zip(x[uuu],y[uuu],z[uuu]):
-            (eta, xi) = cartesian_to_eta_xi(xx,yy,zz)
+            (xi, eta) = cartesian_to_eta_xi(xx,yy,zz)
             etas[i] = eta
             xis[i] = xi
             i+=1
@@ -580,7 +637,7 @@ if __name__ == "__main__":
         xis = np.zeros(len(x[vvv]),)
         i=0
         for xx, yy, zz in zip(x[vvv],y[vvv],z[vvv]):
-            (eta, xi) = cartesian_to_eta_xi(xx,yy,zz)
+            (xi, eta) = cartesian_to_eta_xi(xx,yy,zz)
             etas[i] = eta
             xis[i] = xi
             i+=1
@@ -676,7 +733,7 @@ if __name__ == "__main__":
 
     anixy.save('anixy.gif', writer='imagemagick', fps=10)
 
-    anirho = FuncAnimation(figrho, updatexy, int(period), fargs=(data2, linerho), blit=False)
-    anirho.sae('anirho.gif', writer='imagemagick', fps=10)
+    anirho = FuncAnimation(figrho, updaterhotheta, int(period), fargs=(data2, linerho), blit=False)
+    anirho.save('anirho.gif', writer='imagemagick', fps=10)
 
     #plt.show() 
