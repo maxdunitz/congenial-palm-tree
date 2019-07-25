@@ -308,6 +308,15 @@ if __name__ == "__main__":
         imglan.set_data(img)
         return [imglan]
 
+    def unit_circle_to_arbitrary_circle(xi, eta, Rpix):
+        assert(-1 <= xi and xi <= 1)
+        assert(-1 <= eta and eta <= 1)
+        return int(xi*Rpix), int(eta*Rpix)
+
+    direction_cosines = [(.2, .4), (-.2, .4), (-.2, -.4), (.2, -.4)]
+
+    
+
     # animation function.  This is called sequentially
     def animate(i):
         long_ctr = int((i/period) * Nlong)
@@ -324,6 +333,11 @@ if __name__ == "__main__":
         img_prime_0[mask] = 255
         img_prime_1[mask] = 255
         img_prime_2[mask] = 255
+        for d in direction_cosines:
+            ps = unit_circle_to_arbitrary_circle(xi, eta, radius_in_pixels)
+            for xii, etaa in ps:
+                pass
+                ## ADD point for xi, eta
         img_prime = np.zeros((Nlat,Nlong,3)).astype('uint8')
         img_prime[:,:,0] = img_prime_0.astype('uint8')
         img_prime[:,:,1] = img_prime_1.astype('uint8')
