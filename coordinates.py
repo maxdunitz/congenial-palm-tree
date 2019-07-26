@@ -311,11 +311,9 @@ if __name__ == "__main__":
     def unit_circle_to_arbitrary_circle(xi, eta, Rpix):
         assert(-1 <= xi and xi <= 1)
         assert(-1 <= eta and eta <= 1)
-        return int(xi*Rpix), int(eta*Rpix)
+        return (int(xi*Rpix), int(eta*Rpix))
 
-    direction_cosines = [(.2, .4), (-.2, .4), (-.2, -.4), (.2, -.4)]
-
-    
+    direction_cosines = [(x,y) for x in [0.1*p for p in range(10)] for y in [0.1*q for q in range(10)]]
 
     # animation function.  This is called sequentially
     def animate(i):
@@ -333,11 +331,84 @@ if __name__ == "__main__":
         img_prime_0[mask] = 255
         img_prime_1[mask] = 255
         img_prime_2[mask] = 255
-        for d in direction_cosines:
-            ps = unit_circle_to_arbitrary_circle(xi, eta, radius_in_pixels)
-            for xii, etaa in ps:
-                pass
-                ## ADD point for xi, eta
+        for xi_, eta_ in direction_cosines:
+            d_xi_idx, d_eta_idx = unit_circle_to_arbitrary_circle(xi_, eta_, radius_in_pixels)
+            print(d_xi_idx, d_eta_idx)
+            img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+            img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+            img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+            img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+            img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+            img_prime_0[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+            img_prime_0[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+            img_prime_0[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0 
+            img_prime_0[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+            img_prime_0[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+            img_prime_0[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+            img_prime_0[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+            img_prime_0[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0 
+            img_prime_0[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+            img_prime_0[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+            img_prime_0[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+            img_prime_0[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+            img_prime_0[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0 
+            img_prime_0[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+            img_prime_0[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+            img_prime_0[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+            img_prime_0[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+            img_prime_0[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0 
+            img_prime_0[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+            img_prime_0[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+            img_prime_1[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
         img_prime = np.zeros((Nlat,Nlong,3)).astype('uint8')
         img_prime[:,:,0] = img_prime_0.astype('uint8')
         img_prime[:,:,1] = img_prime_1.astype('uint8')
