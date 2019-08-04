@@ -48,15 +48,37 @@ def eta_xi_to_satellite_centered_spherical(xi, eta):
     theta = np.pi - theta
     
     # compute phi
-    phi = np.arctan(eta/xi)
-    if eta < 0: # northern hemisphere
-        phi = phi + np.pi
-    if phi < 0:
-        phi = phi + 2*np.pi
+    if xi == 0 and eta == 0: # SSP, phi undefined
+        phi = np.pi/2
+    elif xi == 0: # xi = 0 --> on trace, pi/2 if in front, 3pi/2 if behind
+        phi = np.pi/2 if eta > 0 else 3*np.pi/2
+    elif eta == 0: #eta = 0 --> on line perpindicular to trace that passes through SSP, phi = pi if northern hemisphere (xi < 0) and 0 if southern (xi > 0)
+        phi = np.pi if xi < 0 else 0
+    else: # neither SSP, on trace, or along line perpendicular to trace through SSP
+        phi = np.arctan(eta/xi) # well-defined, in [-pi/2, pi/2]
+        if xi < 0 and eta < 0: # northern hemisphere, behind
+            # computed phi is positive
+            phi = np.pi + phi
+        elif xi < 0 and eta > 0: # northern hemisphere, in front
+            # computed phi is negative
+            phi = np.pi + phi
+        elif xi > 0 and eta < 0: # southern hemisphere, behind
+            # computed phi is negative
+            phi = 2*np.pi + phi
+        elif xi > 0 and eta > 0: # southern hemisphere, in front
+            # computed phi is positive and should be
+            phi = phi
 
     # compute rho
     rho = np.abs((R+h)*np.cos(theta) + np.sqrt(R**2 - (np.sin(theta)*(R+h))**2))
-    
+
+# (R+h)sin\theta is R when u points to horizon...when theta is bigger (u is smaller), (R+h)sin\theta is less than R...when u is 0, (R+h)sin\theta is 0
+
+# (R+h) cos \theta is negative...cos \theta = - cos u
+# (R+h) cos u is rho when u is at the horizon....when u is smaller, (R+h)cosu is bigger....when u is 0, (R+h)cos u is (R+h)
+
+#
+
     return (rho, theta, phi)
 
 
@@ -93,17 +115,6 @@ def eta_xi_to_x_y(xi, eta):
     yang = np.arctan(ygeo/xgeo)
     return (R*xang, R*yang)
 
-#def eta_xi_to_x_y_lookangle(eta, xi):
-    #ztr = np.sqrt(R**2 - np.sin(theta)**2 * np.sin(phi)**2 * ((R+h)*np.cos(theta) + np.sqrt(R**2-(R+h)**2*np.sin(theta)**2))**2)
-    #xobs,yobs,zobs = eta_xi_to_satellite_centered_Cartesian(eta, xi)
-    #CTR_SSP = np.array([0,0,R])
-    #CTR_OBS = np.array([xobs,yobs,zobs+R+h])
-    #CTR_TR = np.array([0,yobs,ztr])
-    #xangular = np.arccos(np.dot(CTR_SSP,CTR_TR)/(R**2))
-    #yangular = np.arccos(np.dot(CTR_TR,CTR_OBS)/(R**2))
-    #gamma = np.arccos(np.cos(xangular)*np.cos(yangular))
-    #lookangle = np.arccos((R+h)/rho * np.sin(gamma))
-    #return (R*xangular, R*yangular, lookangle, rho)
 
 def geocentric_obs_and_geocentric_sat_to_everything(dir_1, dir_2, M, minutes):
     t = (2*np.pi)/period * minutes
@@ -198,6 +209,18 @@ def cartesian_to_spherical(x,y,z):
     phi = np.atan2(y,x)
     return (rho, theta, phi)
 
+def spherical_to_cartesian(rho, theta, phi):
+    x = rho * np.sin(theta)*np.cos(phi)
+    y = rho * np.sin(theta)*np.sin(phi)
+    z = rho * np.cos(theta)
+    return (x,y,z)
+
+def rotation_matrix(axis, theta):
+    """
+    Return the rotation matrix associated with counterclockwise rotation about
+    the given axis by theta radians.
+    """
+    axis = np.asarray(axis)
 def spherical_to_cartesian(rho, theta, phi):
     x = rho * np.sin(theta)*np.cos(phi)
     y = rho * np.sin(theta)*np.sin(phi)
@@ -774,18 +797,6 @@ if __name__ == "__main__":
     # Animate
     # first sphere
     ani1 = FuncAnimation(fig, update, int(period), fargs=(data, line), blit=False)
-    ani1.save('ani1.gif', writer='imagemagick', fps=10)
-    if show_echoes:
-        ani_0 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[0], lines3d[0]), blit=False)
-        ani_1 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[1], lines3d[1]), blit=False)
-        ani_2 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[2], lines3d[2]), blit=False)
-        ani_3 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[3], lines3d[3]), blit=False)
-        ani_4 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[4], lines3d[4]), blit=False)
-        ani_5 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[5], lines3d[5]), blit=False)
-        ani_6 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[6], lines3d[6]), blit=False)
-        ani_7 = FuncAnimation(fig, update3, int(period), fargs=(datas3d[7], lines3d[7]), blit=False)
-    
-    # rotated sphere 
     a1 = FuncAnimation(fig5, update, int(period), fargs=(data7, line7), blit=False)
     a1.save('a1.gif', writer='imagemagick',fps=10)
     if show_echoes:
