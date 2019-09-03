@@ -44,8 +44,11 @@ def mpl_sphere(image_file):
 
 def eta_xi_to_satellite_centered_spherical(xi, eta):
     # compute theta
-    theta = np.arcsin(np.sqrt(eta**2 + xi**2))
-    theta = np.pi - theta
+    print(eta, xi)
+    u = np.arcsin(np.sqrt(eta**2 + xi**2))
+    theta = np.pi - u
+    visible = is_visible_(theta)
+    print("theta", theta, "OBS is on Earth", visible) 
     
     # compute phi
     if xi == 0 and eta == 0: # SSP, phi undefined
@@ -68,28 +71,61 @@ def eta_xi_to_satellite_centered_spherical(xi, eta):
         elif xi > 0 and eta > 0: # southern hemisphere, in front
             # computed phi is positive and should be
             phi = phi
-
+    print("phi", phi)
+    
     # compute rho
-    rho = np.abs((R+h)*np.cos(theta) + np.sqrt(R**2 - (np.sin(theta)*(R+h))**2))
-
+    rho = -(R+h)*np.cos(theta) - np.sqrt(R**2 - (np.sin(theta)*(R+h))**2)
+    print("rho", rho, "other rho", (R+h)*np.sqrt(1-xi**2-eta**2) - np.sqrt(R**2 - (eta**2+xi**2)*(R+h)**2))
 # (R+h)sin\theta is R when u points to horizon...when theta is bigger (u is smaller), (R+h)sin\theta is less than R...when u is 0, (R+h)sin\theta is 0
-
+    assert( (R+h)*np.sin(theta) <= R and (R+h)*np.sin(theta) >= 0 ) #"sanity check fail: 0 <= (R+h)sin theta <= R", (R+h)*np.sin(theta) <= R, (R+h)*np.sin(theta) >= 0)
+    assert( np.sqrt(h**2 + 2*R*h) >= rho and rho >= 0 ) # print("sanity check fail: 0 <= rho <= sqrt(h^2 + 2Rh)", 
+    assert( np.abs(xi - np.sin(theta)*np.cos(phi)) <= 10e-4 ) # print("sanity check fail: xi = sin theta cos phi)", n
+    assert( np.abs(eta - np.sin(theta)*np.sin(phi)) <= 10e-4 ) #print("sanity check fail: eta = sin theta sin phi)", np.abs(eta - np.sin(theta)*np.sin(phi)) <= 10e-4)
 # (R+h) cos \theta is negative...cos \theta = - cos u
 # (R+h) cos u is rho when u is at the horizon....when u is smaller, (R+h)cosu is bigger....when u is 0, (R+h)cos u is (R+h)
 
-#
+    return (rho, theta, phi, visible)
 
-    return (rho, theta, phi)
+def eta_xi_to_geocentric_Cartesian(xi, eta):
+    rho, theta, phi, visible = eta_xi_to_satellite_centered_spherical(xi, eta)
+    print(rho, theta, phi, visible)
+    u = np.pi - theta
+    d_Px_SAT = rho*np.cos(u)
+    xctr = R + h - d_Px_SAT
+    sqrt_dy_sq_plus_dz_sq = rho*np.sin(u)
+    if xi == 0 and eta == 0: # SSP, phi undefined
+        return (R,0,0)
+    elif xi == 0: # xi = 0 --> on trace, pi/2 if in front, 3pi/2 if behind
+        phi_prime = 0
+    elif eta == 0: #eta = 0 --> on line perpindicular to trace that passes through SSP, phi = pi if northern hemisphere (xi < 0) and 0 if southern (xi > 0)
+        phi_prime = np.pi/2
+    elif xi < 0 and eta < 0: # northern hemishpere, behind
+        phi_prime = 3.0*np.pi/2 - phi
+    elif xi < 0 and eta > 0: #northern hemisphere, in front
+        phi_prime = phi - np.pi/2
+    elif xi > 0 and eta < 0: #southern hemisphere, behind
+        phi_prime = phi - 3.0*np.pi/2
+    elif xi > 0 and eta > 0: #southern hemisphere, in front
+        phi_prime = np.pi/2 - phi
+    abs_dy = sqrt_dy_sq_plus_dz_sq * np.cos(phi_prime)
+    abs_dz = sqrt_dy_sq_plus_dz_sq * np.sin(phi_prime)
+    yctr = np.sign(eta)*abs_dy
+    zctr = -np.sign(xi)*abs_dz
+    assert(xctr < R)
+    assert(np.abs(np.sqrt(xctr**2 + yctr**2 + zctr**2) - R) < 10e-2)
+    return (xctr, yctr, zctr)
 
 
-def eta_xi_to_satellite_centered_Cartesian(xi, eta):
+'''def eta_xi_to_satellite_centered_Cartesian(xi, eta):
+    ## WRONG?? ##
+    
     zeta = np.sqrt(1-xi**2-eta**2)
     second_term = np.sqrt(R**2-(R+h)**2*(xi**2+eta**2))
     common_term = (R+h)*zeta - second_term
     x = xi * common_term
     y = eta * common_term
     z = -1.0*zeta*common_term
-    return (x,y,z)
+    return (x,y,z)'''
 
 def geocentric_Cartesian_to_satellite_centered_spherical(x,y,z):
     # moving in positive x-direction when Earth-centered Cartesian coordinates is moving in positive z-direction in satellite-centered Cartesian
@@ -106,6 +142,7 @@ def geocentric_Cartesian_to_satellite_centered_spherical(x,y,z):
     if y < 0:
         phi = 2.0*np.pi - phi
     return (rho, theta, phi)
+
 
 def eta_xi_to_x_y(xi, eta):
     rho,theta,phi = eta_xi_to_satellite_centered_spherical(xi, eta)
@@ -174,10 +211,10 @@ def geocentric_obs_and_geocentric_sat_to_everything(dir_1, dir_2, M, minutes):
     elif dy < 0 and dz > 0:
         phi = 3*np.pi/2 - phi_prime
     elif dy < 0 and dz < 0:
-        phi = 2*np.pi - phi_prime
+        phi = 3*np.pi/2 + phi_prime
 
     # is the observed point observable?
-    visible_flag = is_visible(theta)
+    visible_flag = is_visible_(theta)
 
     # get direction cosines
     xi, eta = spherical_to_eta_xi(rho, theta, phi)
@@ -206,7 +243,7 @@ def spherical_to_eta_xi(rho, theta, phi):
 def cartesian_to_spherical(x,y,z):
     rho = np.sqrt(x**2 + y**2 + z**2)
     theta = np.arccos(z/rho)
-    phi = np.atan2(y,x)
+    phi = np.arctan2(y,x)
     return (rho, theta, phi)
 
 def spherical_to_cartesian(rho, theta, phi):
@@ -221,6 +258,18 @@ def rotation_matrix(axis, theta):
     the given axis by theta radians.
     """
     axis = np.asarray(axis)
+    x = rho * np.sin(theta)*np.cos(phi)
+    y = rho * np.sin(theta)*np.sin(phi)
+    z = rho * np.cos(theta)
+    return (x,y,z)
+
+def rotation_matrix(axis, theta):
+    """
+    Return the rotation matrix associated with counterclockwise rotation about
+    the given axis by theta radians.
+    """
+    axis = np.asarray(axis)
+
 def spherical_to_cartesian(rho, theta, phi):
     x = rho * np.sin(theta)*np.cos(phi)
     y = rho * np.sin(theta)*np.sin(phi)
@@ -258,7 +307,7 @@ def get_rotation_e3_to_new_orthonormal_basis(u,v,w):
 def get_rotation_on_basis_to_e3(u,v,w):
     return get_rotation_e3_to_new_orthonormal_basis(u,v,w).T
 
-def is_visible(theta):
+def is_visible_(theta):
     print(R, h, "Seuil", np.pi - np.arcsin(R/(R+h)))
     return theta >= (np.pi - np.arcsin(R/(R+h)))
 
@@ -318,10 +367,11 @@ if __name__ == "__main__":
     figplan = plt.figure()
     img=mpimg.imread('bluemarble1.jpg')
     Nlat, Nlong, rgb = img.shape
-    pixels_per_radian = Nlat/np.pi
+    print(Nlat, Nlong)
+    pixels_per_radian = Nlat/np.pi ## pi vertically, 2pi horizontally
     equator = int(Nlat/2)
     assert(np.abs(pixels_per_radian - Nlong/(2*np.pi)) < 10e-5)
-    radius_in_radians = np.arcsin(R/(R+h))
+    radius_in_radians = np.pi/2-np.arcsin(R/(R+h))
     radius_in_pixels = radius_in_radians * pixels_per_radian
     radius_in_pixels = int(radius_in_pixels)
     imglan = plt.imshow(img)
@@ -331,20 +381,29 @@ if __name__ == "__main__":
         imglan.set_data(img)
         return [imglan]
 
-    def unit_circle_to_arbitrary_circle(xi, eta, Rpix):
+    def unit_circle_to_arbitrary_circle(xi, eta, ppr):
+        x,y,z = eta_xi_to_geocentric_Cartesian(eta, xi)
+        rho, theta, phi = cartesian_to_spherical(x,y,z)
+        yang = phi
+        xang = np.pi/2 - theta 
+        #xang = x/R #TODO FIX wrong because of curvature
+        #yang = y/R
         assert(-1 <= xi and xi <= 1)
         assert(-1 <= eta and eta <= 1)
-        return (int(xi*Rpix), int(eta*Rpix))
+        return (int(xang*ppr), int(yang*ppr))
 
-    direction_cosines = [(x,y) for x in [0.1*p for p in range(10)] for y in [0.1*q for q in range(10)]]
+    def is_visible(eta, xi):
+        theta = np.pi - np.arcsin(np.sqrt(eta**2+xi**2))
+        return is_visible_(theta)
 
+    direction_cosines = [(x,y) for x in [0.002*p for p in range(-500,501)] for y in [0.01*q for q in range(-100,101)] if is_visible(x,y)]
     # animation function.  This is called sequentially
     def animate(i):
         long_ctr = int((i/period) * Nlong)
         kernel = np.zeros((2*radius_in_pixels+1, 2*radius_in_pixels+1))
         y,x = np.ogrid[-equator:Nlat-equator, -long_ctr:Nlong-long_ctr]
         mask = x**2 + y**2 <= radius_in_pixels**2
-        im = imglan.get_array()
+        im = img#imglan.get_array()
         img_prime_0 = np.zeros((Nlat,Nlong))
         img_prime_0[:,:] = im[:,:,0]
         img_prime_1 = np.zeros((Nlat,Nlong))
@@ -355,9 +414,11 @@ if __name__ == "__main__":
         img_prime_1[mask] = 255
         img_prime_2[mask] = 255
         for xi_, eta_ in direction_cosines:
-            d_xi_idx, d_eta_idx = unit_circle_to_arbitrary_circle(xi_, eta_, radius_in_pixels)
-            print(d_xi_idx, d_eta_idx)
-            img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+            d_xi_idx, d_eta_idx = unit_circle_to_arbitrary_circle(xi_, eta_, pixels_per_radian)
+            img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx)%Nlong] = im[:,:,0] 
+            img_prime_1[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx)%Nlong] = im[:,:,1]
+            img_prime_2[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx)%Nlong] = im[:,:,2]
+            '''img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
             img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
             img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
             img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
@@ -431,7 +492,7 @@ if __name__ == "__main__":
             img_prime_2[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
             img_prime_2[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
             img_prime_2[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+            img_prime_2[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0'''
         img_prime = np.zeros((Nlat,Nlong,3)).astype('uint8')
         img_prime[:,:,0] = img_prime_0.astype('uint8')
         img_prime[:,:,1] = img_prime_1.astype('uint8')
@@ -444,7 +505,7 @@ if __name__ == "__main__":
                                frames=int(period), blit=False)
 
     anima.save('planimation.gif', writer='imagemagick', fps=10)
-    #anim.save('basic_animation.mp4', fps=30, extra_args=['-vcodec', 'libx264'])
+    anima.save('basic_animation_1.mp4', fps=30, extra_args=['-vcodec', 'libx264'])
 
 
     plt.show()
@@ -786,17 +847,6 @@ if __name__ == "__main__":
         ax4.set_xlabel('eta')
         ax4.set_ylabel('xi')
 
-    ax7.set_xlabel('X')
-    ax7.set_xlim([-1.10*Rorbit, 1.10*Rorbit])
-    ax7.set_ylabel('Y')
-    ax7.set_ylim([-1.10*Rorbit, 1.10*Rorbit])
-    ax7.set_zlabel('Z')
-    ax7.set_zlim([-1.10*Rorbit, 1.10*Rorbit])
-
-
-    # Animate
-    # first sphere
-    ani1 = FuncAnimation(fig, update, int(period), fargs=(data, line), blit=False)
     a1 = FuncAnimation(fig5, update, int(period), fargs=(data7, line7), blit=False)
     a1.save('a1.gif', writer='imagemagick',fps=10)
     if show_echoes:
