@@ -42,13 +42,11 @@ def mpl_sphere(image_file):
 
 ## helper functions ##
 
-def eta_xi_to_satellite_centered_spherical(xi, eta):
+def xi_eta_to_satellite_centered_spherical(xi, eta):
     # compute theta
-    print(eta, xi)
     u = np.arcsin(np.sqrt(eta**2 + xi**2))
     theta = np.pi - u
     visible = is_visible_(theta)
-    print("theta", theta, "OBS is on Earth", visible) 
     
     # compute phi
     if xi == 0 and eta == 0: # SSP, phi undefined
@@ -71,11 +69,9 @@ def eta_xi_to_satellite_centered_spherical(xi, eta):
         elif xi > 0 and eta > 0: # southern hemisphere, in front
             # computed phi is positive and should be
             phi = phi
-    print("phi", phi)
     
     # compute rho
     rho = -(R+h)*np.cos(theta) - np.sqrt(R**2 - (np.sin(theta)*(R+h))**2)
-    print("rho", rho, "other rho", (R+h)*np.sqrt(1-xi**2-eta**2) - np.sqrt(R**2 - (eta**2+xi**2)*(R+h)**2))
 # (R+h)sin\theta is R when u points to horizon...when theta is bigger (u is smaller), (R+h)sin\theta is less than R...when u is 0, (R+h)sin\theta is 0
     assert( (R+h)*np.sin(theta) <= R and (R+h)*np.sin(theta) >= 0 ) #"sanity check fail: 0 <= (R+h)sin theta <= R", (R+h)*np.sin(theta) <= R, (R+h)*np.sin(theta) >= 0)
     assert( np.sqrt(h**2 + 2*R*h) >= rho and rho >= 0 ) # print("sanity check fail: 0 <= rho <= sqrt(h^2 + 2Rh)", 
@@ -86,8 +82,8 @@ def eta_xi_to_satellite_centered_spherical(xi, eta):
 
     return (rho, theta, phi, visible)
 
-def eta_xi_to_geocentric_Cartesian(xi, eta):
-    rho, theta, phi, visible = eta_xi_to_satellite_centered_spherical(xi, eta)
+def xi_eta_to_geocentric_Cartesian(xi, eta):
+    rho, theta, phi, visible = xi_eta_to_satellite_centered_spherical(xi, eta)
     print(rho, theta, phi, visible)
     u = np.pi - theta
     d_Px_SAT = rho*np.cos(u)
@@ -144,9 +140,9 @@ def geocentric_Cartesian_to_satellite_centered_spherical(x,y,z):
     return (rho, theta, phi)
 
 
-def eta_xi_to_x_y(xi, eta):
-    rho,theta,phi = eta_xi_to_satellite_centered_spherical(xi, eta)
-    xsat, ysat, zsat = eta_xi_to_satellite_centered_Cartesian(xi,eta)
+def xi_eta_to_x_y(xi, eta):
+    rho,theta,phi = xi_eta_to_satellite_centered_spherical(xi, eta)
+    xsat, ysat, zsat = xi_eta_to_satellite_centered_Cartesian(xi,eta)
     xgeo, ygeo, zgeo = (R*np.cos(np.arcsin(np.sqrt(xsat**2+ysat**2)/R)), ysat, -xsat)
     xang = np.arcsin(zgeo/R)
     yang = np.arctan(ygeo/xgeo)
@@ -177,7 +173,6 @@ def geocentric_obs_and_geocentric_sat_to_everything(dir_1, dir_2, M, minutes):
     gamma = np.arcsin(rho * np.sin(u) / R) ## assumes observed point is observable
     # check that gamma is the same as computed using dot product
     gamma_2 = np.arccos(np.dot(obs_loc_geocentric, sat_loc_geocentric)/(R*(R+h)))
-    print("GAMMA", gamma, gamma_2)
 
 
     # find length CTR-P_x
@@ -297,8 +292,6 @@ def rodrigues_rotation(v, axis, theta):
 
 def get_rotation_e3_to_new_orthonormal_basis(u,v,w):
     M = np.zeros((3,3))
-    print(M)
-    print(u.shape)
     M[:,0] = u
     M[:,1] = v
     M[:,2] = w
@@ -308,7 +301,6 @@ def get_rotation_on_basis_to_e3(u,v,w):
     return get_rotation_e3_to_new_orthonormal_basis(u,v,w).T
 
 def is_visible_(theta):
-    print(R, h, "Seuil", np.pi - np.arcsin(R/(R+h)))
     return theta >= (np.pi - np.arcsin(R/(R+h)))
 
 if __name__ == "__main__":
@@ -355,6 +347,7 @@ if __name__ == "__main__":
     mapping = False
     show_midpoints = False
     show_echoes = False
+    animate_trace = False
 
     # Set figures
     fig = plt.figure()
@@ -367,7 +360,6 @@ if __name__ == "__main__":
     figplan = plt.figure()
     img=mpimg.imread('bluemarble1.jpg')
     Nlat, Nlong, rgb = img.shape
-    print(Nlat, Nlong)
     pixels_per_radian = Nlat/np.pi ## pi vertically, 2pi horizontally
     equator = int(Nlat/2)
     assert(np.abs(pixels_per_radian - Nlong/(2*np.pi)) < 10e-5)
@@ -382,132 +374,153 @@ if __name__ == "__main__":
         return [imglan]
 
     def unit_circle_to_arbitrary_circle(xi, eta, ppr):
-        x,y,z = eta_xi_to_geocentric_Cartesian(eta, xi)
+        x,y,z = xi_eta_to_geocentric_Cartesian(xi, eta)
         rho, theta, phi = cartesian_to_spherical(x,y,z)
         yang = phi
         xang = np.pi/2 - theta 
-        #xang = x/R #TODO FIX wrong because of curvature
-        #yang = y/R
+        print("XANG, YANG", xang, yang)
         assert(-1 <= xi and xi <= 1)
         assert(-1 <= eta and eta <= 1)
         return (int(xang*ppr), int(yang*ppr))
 
     def is_visible(eta, xi):
+        print("eta", eta, "xi", xi, "argument_to_arcsin", np.sqrt(eta**2+xi**2))
         theta = np.pi - np.arcsin(np.sqrt(eta**2+xi**2))
         return is_visible_(theta)
+    if animate_trace:
+        direction_cosines = [(x,y) for x in [0.01*p for p in range(-100,101)] for y in [0.02*q for q in range(-50,51)] if is_visible(x,y)]
+        # animation function.  This is called sequentially
+        def animate(i):
+            long_ctr = int((i/period) * Nlong)
+            kernel = np.zeros((2*radius_in_pixels+1, 2*radius_in_pixels+1))
+            y,x = np.ogrid[-equator:Nlat-equator, -long_ctr:Nlong-long_ctr]
+            mask = x**2 + y**2 <= radius_in_pixels**2
+            im = img[:,:,:]#imglan.get_array()
+            img_prime_0 = np.zeros((Nlat,Nlong))
+            img_prime_0[:,:] = im[:,:,0]
+            img_prime_1 = np.zeros((Nlat,Nlong))
+            img_prime_1[:,:] = im[:,:,1]
+            img_prime_2 = np.zeros((Nlat,Nlong))
+            img_prime_2[:,:] = im[:,:,2]
+            img_prime_0[mask] = 255
+            img_prime_1[mask] = 255
+            img_prime_2[mask] = 255
+            for xi_, eta_ in direction_cosines:
+                d_xi_idx, d_eta_idx = unit_circle_to_arbitrary_circle(xi_, eta_, pixels_per_radian)
+                img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx)%Nlong] = img[(equator-d_xi_idx)%Nlat,(long_ctr+d_eta_idx)%Nlong,0] 
+                img_prime_1[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx)%Nlong] = img[(equator-d_xi_idx)%Nlat,(long_ctr+d_eta_idx)%Nlong,1]
+                img_prime_2[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx)%Nlong] = img[(equator-d_xi_idx)%Nlat,(long_ctr+d_eta_idx)%Nlong,2]
+                '''img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+                img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+                img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+                img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+                img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+                img_prime_0[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+                img_prime_0[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+                img_prime_0[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0 
+                img_prime_0[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+                img_prime_0[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+                img_prime_0[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+                img_prime_0[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+                img_prime_0[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0 
+                img_prime_0[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+                img_prime_0[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+                img_prime_0[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+                img_prime_0[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+                img_prime_0[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0 
+                img_prime_0[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+                img_prime_0[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+                img_prime_0[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+                img_prime_0[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+                img_prime_0[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0 
+                img_prime_0[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+                img_prime_0[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+                img_prime_1[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
+                img_prime_2[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0'''
+                img_prime = np.zeros((Nlat,Nlong,3)).astype('uint8')
+                img_prime[:,:,0] = img_prime_0.astype('uint8')
+                img_prime[:,:,1] = img_prime_1.astype('uint8')
+            img_prime[:,:,2] = img_prime_2.astype('uint8')
+            imgo = imglan.set_array(img_prime)
+            ##circular_mean = gf(data, np.mean, footprint=kernel)
+            return [imgo]
+            
+            anima = FuncAnimation(figplan, animate, init_func=init,
+                                   frames=int(period), blit=False)
 
-    direction_cosines = [(x,y) for x in [0.002*p for p in range(-500,501)] for y in [0.01*q for q in range(-100,101)] if is_visible(x,y)]
-    # animation function.  This is called sequentially
-    def animate(i):
-        long_ctr = int((i/period) * Nlong)
-        kernel = np.zeros((2*radius_in_pixels+1, 2*radius_in_pixels+1))
-        y,x = np.ogrid[-equator:Nlat-equator, -long_ctr:Nlong-long_ctr]
-        mask = x**2 + y**2 <= radius_in_pixels**2
-        im = img#imglan.get_array()
-        img_prime_0 = np.zeros((Nlat,Nlong))
-        img_prime_0[:,:] = im[:,:,0]
-        img_prime_1 = np.zeros((Nlat,Nlong))
-        img_prime_1[:,:] = im[:,:,1]
-        img_prime_2 = np.zeros((Nlat,Nlong))
-        img_prime_2[:,:] = im[:,:,2]
-        img_prime_0[mask] = 255
-        img_prime_1[mask] = 255
-        img_prime_2[mask] = 255
-        for xi_, eta_ in direction_cosines:
-            d_xi_idx, d_eta_idx = unit_circle_to_arbitrary_circle(xi_, eta_, pixels_per_radian)
-            img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx)%Nlong] = im[:,:,0] 
-            img_prime_1[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx)%Nlong] = im[:,:,1]
-            img_prime_2[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx)%Nlong] = im[:,:,2]
-            '''img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
-            img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
-            img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
-            img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
-            img_prime_0[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
-            img_prime_0[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
-            img_prime_0[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
-            img_prime_0[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0 
-            img_prime_0[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
-            img_prime_0[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
-            img_prime_0[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
-            img_prime_0[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
-            img_prime_0[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0 
-            img_prime_0[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
-            img_prime_0[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
-            img_prime_0[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
-            img_prime_0[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
-            img_prime_0[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0 
-            img_prime_0[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
-            img_prime_0[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
-            img_prime_0[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
-            img_prime_0[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
-            img_prime_0[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0 
-            img_prime_0[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
-            img_prime_0[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
-            img_prime_1[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx-1)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx-2)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx+1)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx-2)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx-1)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+1)%Nlong] = 0
-            img_prime_2[(equator-d_xi_idx+2)%Nlat, (long_ctr+d_eta_idx+2)%Nlong] = 0'''
-        img_prime = np.zeros((Nlat,Nlong,3)).astype('uint8')
-        img_prime[:,:,0] = img_prime_0.astype('uint8')
-        img_prime[:,:,1] = img_prime_1.astype('uint8')
-        img_prime[:,:,2] = img_prime_2.astype('uint8')
-        imgo = imglan.set_array(img_prime)
-        ##circular_mean = gf(data, np.mean, footprint=kernel)
-        return [imgo]
+            anima.save('planimation.gif', writer='imagemagick', fps=10)
+            anima.save('basic_animation_1.mp4', fps=30, extra_args=['-vcodec', 'libx264'])
 
-    anima = FuncAnimation(figplan, animate, init_func=init,
-                               frames=int(period), blit=False)
-
-    anima.save('planimation.gif', writer='imagemagick', fps=10)
-    anima.save('basic_animation_1.mp4', fps=30, extra_args=['-vcodec', 'libx264'])
-
-
+    direction_cosines_ = [(x,0) for x in np.linspace(-0.99, 0.99, 200) if is_visible(x,0)]
+    print("direction_cosines_", direction_cosines_)
+    im = np.zeros(img.shape).astype('uint8')
+    img.setflags(write=1)
+    im_0 = img[:,:,0].astype('uint8')
+    im_1 = img[:,:,1].astype('uint8')
+    im_2 = img[:,:,2].astype('uint8')
+    im_0[equator-radius_in_pixels:equator+radius_in_pixels,:] = 255
+    im_1[equator-radius_in_pixels:equator+radius_in_pixels,:] = 255
+    im_2[equator-radius_in_pixels:equator+radius_in_pixels,:] = 255
+    for xi_, eta_ in direction_cosines_:
+        print("XI, ETA", xi_, eta_)
+        d_xi_idx, d_eta_idx = unit_circle_to_arbitrary_circle(xi_, eta_, pixels_per_radian)
+        print("PIXEL VALUE", img[equator-d_xi_idx, 0, :])
+        print("RADIUS_IN_PIXELS", radius_in_pixels, "DXI", d_xi_idx)
+        im_0[equator-d_xi_idx, :] = img[equator-d_xi_idx, :, 0].astype('uint8')
+        im_1[equator-d_xi_idx, :] = img[equator-d_xi_idx, :, 1].astype('uint8')
+        im_2[equator-d_xi_idx, :] = img[equator-d_xi_idx, :, 2].astype('uint8')
+    im[:,:,0] = im_0
+    im[:,:,1] = im_1
+    im[:,:,2] = im_2
+    plt.imshow(im)
     plt.show()
 
     if second_disk:
@@ -646,7 +659,6 @@ if __name__ == "__main__":
         datas3d_7 = []
         for r in rotations_to_probe:
             d = np.array(list(gen7(period, r))).T
-            print(d)
             l, = ax.plot(d[0, 0:1], d[1, 0:1], d[2, 0:1])
             lines3d_7.append(l)
             datas3d_7.append(d)
@@ -656,7 +668,6 @@ if __name__ == "__main__":
     data2 = np.array(list(gen2(period))).T ##[eta, xi, x, y, rho, theta, phi, visible_flag]
     [nmbr,nfeat] = data2.T.shape
     visible_mask = visible_flag = data2[7,:].reshape((nmbr,))
-    print("MASK",1.0*sum(visible_mask)/nmbr)
     visible_mask = visible_mask.reshape((nmbr,1))
     eta_data = data2[0,:].reshape((nmbr,1))
     xi_data = data2[1,:].reshape((nmbr,1))
