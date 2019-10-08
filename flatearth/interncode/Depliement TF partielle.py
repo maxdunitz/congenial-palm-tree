@@ -11,11 +11,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numpy.fft import fft,ifft,fft2, ifft2, fftshift
 import scipy.misc as imageio
-plt.ion()
 
 ## Initialisation
 ti = time.time()
-N,M = (48,3*48+1)
+N,M = (400,3*400+1)
 image=imageio.imread("PlanisphereSatellite_bw.png")[100:100+N, 450:450+M]
 image=np.concatenate((image, image), axis = 1) 
 # On concatene deux fois la même image pour simuler la bande (on n'affichera 
@@ -121,7 +120,7 @@ plt.subplot(3,1,3)
 plt.imshow(np.abs(image[:,:M]-listT), cmap = "gray")
 plt.title("Différence")
 plt.suptitle("Reconstruction par transformée de Fourier partielle")
-
+plt.show()
 print("RMSE =",rmse(image[:,:M],listT))
 
 

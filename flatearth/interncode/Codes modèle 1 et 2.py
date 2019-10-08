@@ -11,50 +11,55 @@ import numpy as np
 import matplotlib.pyplot as plt
 import imageio
 from numpy.fft import fft2,fftshift
-plt.ion()
-
 
 ## Modele 1
 #Initialisation: on crée l'image v0, et les visibilités vtilde
+if False:
+    v0 = imageio.imread("lena.png")[123:143,123:143] #taille 20*20
+    N = v0.shape[1]
+    print(v0[2,3])
 
-v0 = imageio.imread("lena.png")[123:143,123:143] #taille 20*20
-N = v0.shape[1]
+    print(v0.shape)
 
-vtilde  = np.zeros(v0.shape, dtype = complex)
-for k in range(N):
-    for l in range(N):
-        S = sum([sum([v0[m,n]*np.exp(-1j*2*np.pi*(k*m+n*l)/N) for m in range(N)]) for n in range(N)])
-        vtilde[k,l] = S/N**2
+    # TAKE THE FOURIER TRANSFORM OF EACH COLOR CHANNEL
 
-
-# DFT inverse pour obtenir les températures de brillance, w
-
-w = np.zeros(v0.shape, dtype = complex)
-for m in range(N):
-    for n in range(N):
-        S = sum([sum([vtilde[k,l]*np.exp(1j*2*np.pi*(k*m+n*l)/N) for k in range(N)]) for l in range(N)])
-        w[m,n] = S
-
-w = np.real(w)
+    vtilde  = np.zeros(v0.shape, dtype = complex)
+    for k in range(N):
+        for l in range(N):
+            for m in range(N):
+                for n in range(N):
+                    vtilde[k,l,:] += v0[m,n]*np.exp(-1j*2*np.pi*(k*m+n*l)/N) 
+            vtilde[k,l,:] = vtilde[k,l,:]/(N**2)
 
 
-# Affichage des résultats
-plt.figure(1)
-plt.clf()
-plt.subplot(2,2,1)
-plt.imshow(v0, cmap='gray')
-plt.title("Image originale")
-plt.subplot(2,2,2)
-plt.imshow(np.log(1+np.abs(fftshift(vtilde))), cmap = "gray")
-plt.title("Visibilités")
-plt.subplot(2,2,3)
-plt.imshow(np.log(1+np.abs(fftshift(fft2(v0)/N**2))), cmap = "gray")
-plt.title("fft normalisée")
-plt.subplot(2,2,4)
-plt.imshow(w, cmap = 'gray')
-plt.title("Image reconstituée")
-plt.suptitle("Modèle 1")
-plt.show()
+    # DFT inverse pour obtenir les températures de brillance, w
+
+    w = np.zeros(v0.shape, dtype = complex)
+    for m in range(N):
+        for n in range(N):
+            S = sum([sum([vtilde[k,l]*np.exp(1j*2*np.pi*(k*m+n*l)/N) for k in range(N)]) for l in range(N)])
+            w[m,n] = S
+
+    w = np.real(w)
+
+
+    # Affichage des résultats
+    plt.figure(1)
+    plt.clf()
+    plt.subplot(2,2,1)
+    plt.imshow(v0, cmap='gray')
+    plt.title("Image originale")
+    plt.subplot(2,2,2)
+    plt.imshow(np.log(1+np.abs(fftshift(vtilde))), cmap = "gray")
+    plt.title("Visibilités")
+    plt.subplot(2,2,3)
+    plt.imshow(np.log(1+np.abs(fftshift(fft2(v0)/N**2))), cmap = "gray")
+    plt.title("fft normalisée")
+    plt.subplot(2,2,4)
+    plt.imshow(w, cmap = 'gray')
+    plt.title("Image reconstituée")
+    plt.suptitle("Modèle 1")
+    plt.show()
 
 
 
@@ -89,9 +94,10 @@ wImag = np.imag(w)
 assert np.allclose(wImag,wImag*0)
 w = np.real(w)
 
+print(w)
 
 # Affichage des résultats
-plt.figure(2)
+plt.figure(1)
 plt.clf()
 plt.subplot(1,3,1)
 plt.imshow(v0, cmap='gray')
@@ -100,7 +106,7 @@ plt.subplot(1,3,2)
 plt.imshow(np.log(1+np.abs(fftshift(vtilde))), cmap = "gray")
 plt.title("Visibilités (partiellement remplies)")
 plt.subplot(1,3,3)
-plt.imshow(w, cmap = "gray")
+plt.imshow(w.astype('uint8'), cmap = "gray")
 plt.title("Image reconstituée")
 plt.suptitle("Modèle 2, facteur s = " + str(s))
 plt.show()
@@ -230,100 +236,100 @@ def formuleTheorique(v0,s):
 s = 2 #facteur entier
 #Initialisation: on crée l'image v0, et les visibilités vtilde
 N = 48
+if False:
+    v0=imageio.imread("PlanisphereSatellite_bw.png")[168:168+N, 632:632+N]
+    N = v0.shape[1]
 
-v0=imageio.imread("PlanisphereSatellite_bw.png")[168:168+N, 632:632+N]
-N = v0.shape[1]
+    vtilde  = np.zeros(v0.shape, dtype = complex)
+    for k in range(N):
+        for l in range(0,N//2+1,s): #avec un pas s
+            S = sum([sum([v0[m,n]*np.exp(-1j*2*np.pi*(k*m+n*l)/N) for m in range(N)]) for n in range(N)])
+            vtilde[k,l] = S/N
+            
+            if l != 0: #on remplit en même temps vtilde[k,-l]
+                S = sum([sum([v0[m,n]*np.exp(-1j*2*np.pi*(k*m-n*l)/N) for m in range(N)]) for n in range(N)])
+                vtilde[k,-l] = S/N
 
-vtilde  = np.zeros(v0.shape, dtype = complex)
-for k in range(N):
-    for l in range(0,N//2+1,s): #avec un pas s
-        S = sum([sum([v0[m,n]*np.exp(-1j*2*np.pi*(k*m+n*l)/N) for m in range(N)]) for n in range(N)])
-        vtilde[k,l] = S/N
+
+
+    # DFT inverse pour obtenir les températures de brillance, w
+
+    w = np.zeros(v0.shape, dtype = complex)
+    for m in range(N):
+        for n in range(N):
+            S = sum([sum([vtilde[k,l]*np.exp(1j*2*np.pi*(k*m+n*l)/N) for k in range(N)]) for l in range(N)])
+            w[m,n] = S/N
+    wImag = np.imag(w)
+
+    assert np.allclose(wImag,wImag*0)
+    w = np.real(w)
+
+
+    # Affichage des résultats
+    plt.figure(6)
+    plt.clf()
+    plt.subplot(1,3,1)
+    plt.imshow(v0, cmap='gray', vmin = 25, vmax = 190)
+    plt.colorbar()
+    plt.title("Image originale")
+    plt.subplot(1,3,2)
+    plt.imshow(np.log(1+np.abs(fftshift(vtilde))), cmap = "gray")
+    plt.title("Visibilités")
+    plt.subplot(1,3,3)
+    plt.imshow(w, cmap = "gray", vmin = 25, vmax = 190)
+    plt.title("Image obtenue par TFD-1")
+    plt.colorbar()
+    # plt.suptitle("Modèle 2, facteur s = " + str(s))
+    plt.show()
+
+
+    # Comparaison
+    v1 = formuleTheorique(v0,s)
         
-        if l != 0: #on remplit en même temps vtilde[k,-l]
-            S = sum([sum([v0[m,n]*np.exp(-1j*2*np.pi*(k*m-n*l)/N) for m in range(N)]) for n in range(N)])
-            vtilde[k,-l] = S/N
+    err = np.abs(v1-w)
+    assert np.allclose(err, err*0)
+
+    plt.figure(7)
+    plt.clf()
+    plt.subplot(2,2,1)
+    plt.imshow(v0, cmap = 'gray')
+    plt.subplot(2,2,2)
+    plt.imshow(w, cmap='gray')
+    plt.title("w")
+    plt.subplot(2,2,3)
+    plt.imshow(v1, cmap = "gray")
+    plt.title("v1")
+    plt.subplot(2,2,4)
+    plt.imshow(err, cmap = "gray")
+    plt.title("Différences")
+    plt.suptitle("Différences entre theorique et w, s ="+str(s))
+    plt.show()
+
+    plt.figure(8)
+    plt.clf()
+    plt.subplot(1,3,1)
+    plt.imshow(v0, cmap = 'gray')
+    plt.title("Image originale")
+    plt.subplot(1,3,2)
+    plt.imshow(w, cmap='gray')
+    plt.title("Image repliée par TFD-1")
+    plt.subplot(1,3,3)
+    plt.imshow(v1, cmap = "gray")
+    plt.title("Image théorique")
+    plt.show()
+
+    ##
+
+    plt.figure(10)
+    plt.clf()
+    plt.imshow(v0, cmap = 'gray', vmin = 0, vmax = 255)
+
+    plt.figure(11)
+    plt.imshow(np.log(1+np.abs(fftshift(fft2(v0))/N)), cmap = "gray")
+
+    plt.figure(12)
+    plt.imshow(np.log(1+np.abs(fftshift(vtilde))), cmap = "gray")
 
 
-
-# DFT inverse pour obtenir les températures de brillance, w
-
-w = np.zeros(v0.shape, dtype = complex)
-for m in range(N):
-    for n in range(N):
-        S = sum([sum([vtilde[k,l]*np.exp(1j*2*np.pi*(k*m+n*l)/N) for k in range(N)]) for l in range(N)])
-        w[m,n] = S/N
-wImag = np.imag(w)
-
-assert np.allclose(wImag,wImag*0)
-w = np.real(w)
-
-
-# Affichage des résultats
-plt.figure(6)
-plt.clf()
-plt.subplot(1,3,1)
-plt.imshow(v0, cmap='gray', vmin = 25, vmax = 190)
-plt.colorbar()
-plt.title("Image originale")
-plt.subplot(1,3,2)
-plt.imshow(np.log(1+np.abs(fftshift(vtilde))), cmap = "gray")
-plt.title("Visibilités")
-plt.subplot(1,3,3)
-plt.imshow(w, cmap = "gray", vmin = 25, vmax = 190)
-plt.title("Image obtenue par TFD-1")
-plt.colorbar()
-# plt.suptitle("Modèle 2, facteur s = " + str(s))
-plt.show()
-
-
-# Comparaison
-v1 = formuleTheorique(v0,s)
-    
-err = np.abs(v1-w)
-assert np.allclose(err, err*0)
-
-plt.figure(7)
-plt.clf()
-plt.subplot(2,2,1)
-plt.imshow(v0, cmap = 'gray')
-plt.subplot(2,2,2)
-plt.imshow(w, cmap='gray')
-plt.title("w")
-plt.subplot(2,2,3)
-plt.imshow(v1, cmap = "gray")
-plt.title("v1")
-plt.subplot(2,2,4)
-plt.imshow(err, cmap = "gray")
-plt.title("Différences")
-plt.suptitle("Différences entre theorique et w, s ="+str(s))
-plt.show()
-
-plt.figure(8)
-plt.clf()
-plt.subplot(1,3,1)
-plt.imshow(v0, cmap = 'gray')
-plt.title("Image originale")
-plt.subplot(1,3,2)
-plt.imshow(w, cmap='gray')
-plt.title("Image repliée par TFD-1")
-plt.subplot(1,3,3)
-plt.imshow(v1, cmap = "gray")
-plt.title("Image théorique")
-plt.show()
-
-##
-
-plt.figure(10)
-plt.clf()
-plt.imshow(v0, cmap = 'gray', vmin = 0, vmax = 255)
-
-plt.figure(11)
-plt.imshow(np.log(1+np.abs(fftshift(fft2(v0))/N)), cmap = "gray")
-
-plt.figure(12)
-plt.imshow(np.log(1+np.abs(fftshift(vtilde))), cmap = "gray")
-
-
-plt.figure(13)
-plt.imshow(w, cmap='gray', vmin = 0, vmax = 255)
+    plt.figure(13)
+    plt.imshow(w, cmap='gray', vmin = 0, vmax = 255)

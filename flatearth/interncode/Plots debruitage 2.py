@@ -11,7 +11,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numpy.fft import fft,ifft,fft2, ifft2, fftshift
 import imageio
-plt.ion()
 
 def rmse(u,u0):
     N = np.shape(u)[0]
