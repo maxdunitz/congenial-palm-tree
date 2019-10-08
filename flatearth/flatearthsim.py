@@ -51,49 +51,13 @@ def sample(s):
     return lambda_
 
 def get_snapshot(img,N,j,s):
-    img_frame = img[:,j:j+N,:]
-    grayscale = np.mean(img_frame, axis=2)
-    plt.figure(1)
-    plt.subplot(3,3,1)
-    plt.imshow(grayscale,cmap='gray')
-    plt.subplot(3,3,2)
-    transform = np.fft.fft2(grayscale)
-    transform[:,1::s] = 0
-    plt.imshow(np.real(np.fft.ifft2(transform)).astype('uint8'),cmap='gray')
-    
-    image_grayrep = np.zeros(img_frame.shape)
-    image_grayrep[:,:,0] = np.copy(grayscale)
-    image_grayrep[:,:,1] = np.copy(grayscale)
-    image_grayrep[:,:,2] = np.copy(grayscale)
-    undersamp = apply_to_each_color(np.fft.fft2, image_grayrep)
-    undersamp = apply_to_each_color(sample(s), undersamp)
-    undersamp = apply_to_each_color(np.fft.ifft2, undersamp)
-    plt.subplot(3,3,3)
-    plt.imshow(np.real(undersamp).astype('uint8'))
 
-    # undersample in fourier domain
-    fft_img = apply_to_each_color(np.fft.fft2, img_frame)
-    undersampled = apply_to_each_color(sample(s), fft_img)
-
-    # invert for result
-    snapshot = apply_to_each_color(np.fft.ifft2, undersampled)
-    plt.subplot(3,3,4)
-    plt.imshow(np.real(snapshot).astype('uint8'))
-    plt.subplot(3,3,5)
-    plt.imshow(np.real(snapshot[:,:,0]).astype('uint8'), cmap='gray')
-    plt.subplot(3,3,6)
-    plt.imshow(np.real(snapshot[:,:,1]).astype('uint8'), cmap='gray')
-    
-
-    # ignore the color axis
+    # ignore the color axis in indexing to perform subsampling properly
     img_3d = np.copy(img[:,j:j+N,:])
     fft_img = np.fft.fft2(img_3d)
-    fft_img[:,1::s] = 0
+    for j in range(1,s):
+        fft_img[:,j::s] = 0
     ifft = np.fft.ifft2(fft_img)
-    plt.subplot(3,3,7)
-    plt.imshow(np.real(ifft).astype('uint8'))
-    
-    plt.show()
     return ifft
 
 
